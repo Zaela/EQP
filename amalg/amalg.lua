@@ -8,6 +8,7 @@ local includePaths = {
     "src/common/",
     "src/common/db/",
     "src/common/log/",
+    "src/common/net/",
     "src/common/shm/",
     "src/common/sync/",
     "src/common/time/",
