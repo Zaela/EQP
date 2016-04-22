@@ -243,7 +243,7 @@ void Login::processPacket(byte* data, int len, Client* client)
     
     switch (opcode)
     {
-    case LoginRequest:
+    case LoginOp::LoginRequest:
     {
 #pragma pack(1)
         struct Reply
@@ -260,7 +260,7 @@ void Login::processPacket(byte* data, int len, Client* client)
         if (client->progress != 1)
             break;
         
-        Reply reply(seq, sizeof(Reply), client->sendAck++, ChatMessage);
+        Reply reply(seq, sizeof(Reply), client->sendAck++, LoginOp::ChatMessage);
         
         memset(reply.data, 0, sizeof(reply.data));
         
@@ -276,11 +276,11 @@ void Login::processPacket(byte* data, int len, Client* client)
         break;
     }
     
-    case LoginCredentials:
+    case LoginOp::LoginCredentials:
         processCredentials(data, len, client, seq);
         break;
     
-    case ServerListRequest:
+    case LoginOp::ServerListRequest:
     {
 #pragma pack(1)
         struct ServerList
@@ -496,7 +496,7 @@ void Login::processCredentials(byte* data, int len, Client* client, uint16_t seq
             crypto().clear();
             
             // Send LoginAccepted failure packet
-            Rejected rejected(seq, sizeof(Rejected), client->sendAck++, LoginAccepted);
+            Rejected rejected(seq, sizeof(Rejected), client->sendAck++, LoginOp::LoginAccepted);
             
             rejected.unknown[0] = 0x0003;
             rejected.unknown[1] = 0x0000;
@@ -544,7 +544,7 @@ login:
     // Send LoginAccepted success packet
     const Request* req = (Request*)data;
     
-    Accepted accepted(seq, sizeof(Accepted), client->sendAck++, LoginAccepted);
+    Accepted accepted(seq, sizeof(Accepted), client->sendAck++, LoginOp::LoginAccepted);
     
     accepted.unknown[0] = req->unknown[0];
     accepted.unknown[1] = req->unknown[1];

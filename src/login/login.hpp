@@ -114,7 +114,7 @@ private:
     
     static const int BUFFER_SIZE = 1024;
     
-    enum Opcode : uint16_t
+    enum LoginOp : uint16_t
     {
         LoginRequest        = 0x0001,
         LoginCredentials    = 0x0002,
