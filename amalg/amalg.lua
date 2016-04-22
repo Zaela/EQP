@@ -4,15 +4,16 @@ local lfs = require "lfs"
 local ipairs    = ipairs
 local table     = table
 
-local includePaths = {
-    "src/common/",
-    "src/common/db/",
-    "src/common/log/",
-    "src/common/net/",
-    "src/common/shm/",
-    "src/common/sync/",
-    "src/common/time/",
-}
+local includePaths = {"src/common/"}
+
+for path in lfs.dir("src/common/") do
+    if path ~= "." and path ~= ".." then
+        path = "src/common/" .. path .. "/"
+        if lfs.attributes(path, "mode") == "directory" then
+            table.insert(includePaths, path)
+        end
+    end
+end
 
 local included = {}
 
