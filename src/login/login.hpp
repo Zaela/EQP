@@ -10,6 +10,7 @@
 #include "clock.hpp"
 #include "eq_packet_protocol.hpp"
 #include "login_crypto.hpp"
+#include "aligned.hpp"
 #include "source_id.hpp"
 #include "server_op.hpp"
 #include <vector>
@@ -143,14 +144,22 @@ private:
         
         AckPlus(uint16_t clientSeq, uint16_t size, uint16_t serverSeq, uint16_t opcode)
         {
-            combined        = toNetworkShort(EQProtocol::Combined);
-            ackSize         = 0x04;
-            ackOpcode       = toNetworkShort(EQProtocol::Ack);
-            ackSeq          = toNetworkShort(clientSeq);
-            dataSize        = size - sizeof(AckPlus) + 0x06;
-            dataProtoOpcode = toNetworkShort(EQProtocol::Packet);
-            dataSeq         = toNetworkShort(serverSeq);
-            dataOpcode      = opcode;
+            // Ensure writes are aligned
+            AlignedWriter w(this, sizeof(AckPlus));
+            
+            w.uint16(toNetworkShort(EQProtocol::Combined));
+            w.uint8(0x04);
+            w.uint16(toNetworkShort(EQProtocol::Ack));
+            w.uint16(toNetworkShort(clientSeq));
+            w.uint8(size - sizeof(AckPlus) + 0x06);
+            w.uint16(toNetworkShort(EQProtocol::Packet));
+            w.uint16(toNetworkShort(serverSeq));
+            w.uint16(opcode);
+        }
+        
+        AlignedWriter writer()
+        {
+            return AlignedWriter(((byte*)this) + sizeof(AckPlus), dataSize);
         }
     };
 #pragma pack()

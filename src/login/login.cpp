@@ -378,14 +378,22 @@ void Login::sendSessionResponse(Client* client)
     };
 #pragma pack()
     
-    SessionRequest* req = (SessionRequest*)m_sockBuffer;
+    AlignedReader req(m_sockBuffer, sizeof(SessionRequest));
+    req.advance(offsetof(SessionRequest, session));
     
     SessionResponse resp;
-    memset(&resp, 0, sizeof(SessionResponse));
+    AlignedWriter w(&resp, sizeof(SessionResponse));
     
-    resp.opcode     = toNetworkShort(EQProtocol::SessionResponse);
-    resp.session    = req->session;
-    resp.maxLength  = req->maxLength;
+    w.zeroAll();
+    
+    // opcode
+    w.uint16(toNetworkShort(EQProtocol::SessionResponse));
+    // session
+    w.uint32(req.uint32());
+    // key, validation, format, unknownA
+    w.advance(sizeof(uint32_t) + sizeof(uint8_t) * 3);
+    // maxLength
+    w.uint32(req.uint32());
     
     send(client, &resp, sizeof(SessionResponse));
 }
@@ -444,25 +452,23 @@ void Login::processCredentials(byte* data, int len, Client* client, uint16_t seq
         byte        data[16];
     };
     
-    struct Accepted
+    struct Accepted : public AckPlus
     {
-        AckPlus     ackPlus;
         uint16_t    unknown[5];
         byte        encrypted[80];
         
         Accepted(uint16_t clientSeq, uint16_t dataSize, uint16_t serverSeq, uint16_t opcode)
-        : ackPlus(clientSeq, dataSize, serverSeq, opcode) { }
+        : AckPlus(clientSeq, dataSize, serverSeq, opcode) { }
     };
     
-    struct Rejected
+    struct Rejected : public AckPlus
     {
-        AckPlus     ackPlus;
         uint16_t    unknown[5];
         uint64_t    data[5];
         byte        lastData;
         
         Rejected(uint16_t clientSeq, uint16_t dataSize, uint16_t serverSeq, uint16_t opcode)
-        : ackPlus(clientSeq, dataSize, serverSeq, opcode) { }
+        : AckPlus(clientSeq, dataSize, serverSeq, opcode) { }
     };
     
     struct Attempts
@@ -498,19 +504,24 @@ void Login::processCredentials(byte* data, int len, Client* client, uint16_t seq
             // Send LoginAccepted failure packet
             Rejected rejected(seq, sizeof(Rejected), client->sendAck++, LoginOp::LoginAccepted);
             
-            rejected.unknown[0] = 0x0003;
-            rejected.unknown[1] = 0x0000;
-            rejected.unknown[2] = 0x0200;
-            rejected.unknown[3] = 0x0000;
-            rejected.unknown[4] = 0x0000;
+            AlignedWriter w = rejected.writer();
             
-            rejected.data[0] = 0x9f803c647359769b;
-            rejected.data[1] = 0xb6ee57f179a7041a;
-            rejected.data[2] = 0x9f803c648ca68964;
-            rejected.data[3] = 0xb6ee57f179a7041a;
-            rejected.data[4] = 0x9f803c648ca68964;
+            // unknown[5]
+            w.uint16(0x0003);
+            w.uint16(0x0000);
+            w.uint16(0x0200);
+            w.uint16(0x0000);
+            w.uint16(0x0000);
             
-            rejected.lastData = 0x1a;
+            // data[5]
+            w.uint64(0x9f803c647359769b);
+            w.uint64(0xb6ee57f179a7041a);
+            w.uint64(0x9f803c648ca68964);
+            w.uint64(0xb6ee57f179a7041a);
+            w.uint64(0x9f803c648ca68964);
+            
+            // lastData
+            w.uint8(0x1a);
             
             send(client, &rejected, sizeof(Rejected));
             return;
@@ -542,36 +553,44 @@ login:
     crypto().clear();
     
     // Send LoginAccepted success packet
-    const Request* req = (Request*)data;
+    const Request* req = (Request*)data; // This is all aligned
     
     Accepted accepted(seq, sizeof(Accepted), client->sendAck++, LoginOp::LoginAccepted);
     
-    accepted.unknown[0] = req->unknown[0];
-    accepted.unknown[1] = req->unknown[1];
-    accepted.unknown[2] = req->unknown[2];
-    accepted.unknown[3] = req->unknown[3];
-    accepted.unknown[4] = req->unknown[4];
+    AlignedWriter wAccept = accepted.writer();
+    
+    // unknown[5]
+    wAccept.uint16(req->unknown[0]);
+    wAccept.uint16(req->unknown[1]);
+    wAccept.uint16(req->unknown[2]);
+    wAccept.uint16(req->unknown[3]);
+    wAccept.uint16(req->unknown[4]);
     
     Attempts attempts;
+    AlignedWriter wAttempt(&attempts, sizeof(Attempts));
     
-    attempts.unknown    = 0x0000000000000001ULL;
-    attempts.loginId    = (uint32_t)id;
-    memcpy(attempts.key, "0000000000", sizeof(attempts.key)); // Don't bother with a real session key
-    //fixme: everything below here is an unaligned write
-    attempts.count      = 0;
+    // unknown
+    wAttempt.uint64(0x0000000000000001);
+    // loginId
+    wAttempt.uint32((uint32_t)id);
+    // key
+    wAttempt.string("0000000000", sizeof(attempts.key)); // Don't bother with a real session key
+    // count
+    wAttempt.uint32(0);
     
-    attempts.data[ 0] = 0x03ffffff; // The ff's suppress the "Vote Now!" dialog on reaching server select
-    attempts.data[ 1] = 0x02000000;
-    attempts.data[ 2] = 0x000003e7;
-    attempts.data[ 3] = 0xffffffff;
-    attempts.data[ 4] = 0x000005a0;
-    attempts.data[ 5] = 0x02000000;
-    attempts.data[ 6] = 0x000003ff;
-    attempts.data[ 7] = 0x00000000;
-    attempts.data[ 8] = 0x00000063;
-    attempts.data[ 9] = 0x00000001;
-    attempts.data[10] = 0x00000000;
-    attempts.data[11] = 0x00000000;
+    // data[12]
+    wAttempt.uint32(0x03ffffff); // The ff's suppress the "Vote Now!" dialog on reaching server select
+    wAttempt.uint32(0x02000000);
+    wAttempt.uint32(0x000003e7);
+    wAttempt.uint32(0xffffffff);
+    wAttempt.uint32(0x000005a0);
+    wAttempt.uint32(0x02000000);
+    wAttempt.uint32(0x000003ff);
+    wAttempt.uint32(0x00000000);
+    wAttempt.uint32(0x00000063);
+    wAttempt.uint32(0x00000001);
+    wAttempt.uint32(0x00000000);
+    wAttempt.uint32(0x00000000);
     
     // Encrypt and copy into Accepted
     crypto().encrypt(&attempts, sizeof(attempts));

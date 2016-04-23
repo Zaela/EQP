@@ -22,8 +22,10 @@ DIRBIN= bin/
 ##############################################################################
 DIRCOMMON= src/common/
 BCOMMON= build/$(BUILDTYPE)/common/
-_OCOMMON= file.o exception.o
-_HCOMMON= define.hpp terminal.hpp bit.hpp file.hpp exception.hpp log_writer.hpp
+_OCOMMON= \
+ file.o   exception.o   aligned.o
+_HCOMMON= define.hpp terminal.hpp bit.hpp log_writer.hpp \
+ file.hpp exception.hpp aligned.hpp
 OCOMMON= $(patsubst %,$(BCOMMON)%,$(_OCOMMON))
 HCOMMON= $(patsubst %,$(DIRCOMMON)%,$(_HCOMMON))
 
