@@ -5,38 +5,55 @@
 #include "clock.hpp"
 #include <exception>
 
+std::atomic_bool g_shutdown;
+
 int main(int argc, const char** argv)
 {
     (void)argc;
     (void)argv;
     
-    Master master;
+    g_shutdown = false;
     
-    try
+#ifdef EQP_LINUX
+    signal(SIGINT, [](int)
     {
-        master.init();
-        master.mainLoop();
-    }
-    catch (std::exception& e)
+        printf("\n--Interrupted!\n");
+        g_shutdown = true;
+    });
+#endif
+    
+    // Scope for the Master object
     {
-        std::lock_guard<AtomicMutex> lock(master.logWriter().printfMutex());
-        
-        printf(
-            TERM_RED "[ERROR]\n"
-            "================================================================================\n" TERM_DEFAULT
-            TERM_YELLOW "%s\n"
-            TERM_RED "================================================================================\n" TERM_DEFAULT,
-            e.what());
-        
-        master.logWriter().log(Log::Fatal, "%s", e.what());
-    }
-    catch (...)
-    {
-        printf(
-            TERM_RED "[ERROR]\n"
-            "================================================================================\n" TERM_DEFAULT
-            TERM_YELLOW "Caught unknown exception...\n"
-            TERM_RED "================================================================================\n" TERM_DEFAULT);
+        Master master;
+    
+        try
+        {
+            master.init();
+            master.mainLoop();
+            master.shutDownChildProcesses();
+            master.logWriter().log(Log::Info, "Shutting down cleanly");
+        }
+        catch (std::exception& e)
+        {
+            std::lock_guard<AtomicMutex> lock(master.logWriter().printfMutex());
+            
+            printf(
+                TERM_RED "[ERROR]\n"
+                "================================================================================\n" TERM_DEFAULT
+                TERM_YELLOW "%s\n"
+                TERM_RED "================================================================================\n" TERM_DEFAULT,
+                e.what());
+            
+            master.logWriter().log(Log::Fatal, "%s", e.what());
+        }
+        catch (...)
+        {
+            printf(
+                TERM_RED "[ERROR]\n"
+                "================================================================================\n" TERM_DEFAULT
+                TERM_YELLOW "Caught unknown exception...\n"
+                TERM_RED "================================================================================\n" TERM_DEFAULT);
+        }
     }
     
     // Give threads a little time to have their resourced cleaned up;

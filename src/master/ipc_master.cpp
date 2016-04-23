@@ -42,7 +42,7 @@ void IpcMaster::processOutQueue()
     {
         IpcPacket& p = m_outQueue[i];
         
-        if (!m_ipcBuffer->master().push(p.opcode(), p.sourceId(), p.length(), p.data()))
+        if (!m_ipcBuffer->remote().push(p.opcode(), p.sourceId(), p.length(), p.data()))
             break;
         
         i++;

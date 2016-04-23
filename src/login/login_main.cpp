@@ -14,24 +14,31 @@ int main(int argc, const char** argv)
         return 1;
     }
     
-    Login login;
+#ifdef EQP_LINUX
+    signal(SIGINT, SIG_IGN);
+#endif
     
-    try
+    // Scope for Login object
     {
-#ifdef EQP_WINDOWS
+        Login login;
+        
+        try
         {
-            WSADATA wsa;
-            if (WSAStartup(MAKEWORD(2, 2), &wsa))
-                throw Exception("WSAStartup failed");
-        }
+#ifdef EQP_WINDOWS
+            {
+                WSADATA wsa;
+                if (WSAStartup(MAKEWORD(2, 2), &wsa))
+                    throw Exception("WSAStartup failed");
+            }
 #endif
         
-        login.init(argv[1], argv[2]);
-        login.mainLoop();
-    }
-    catch (std::exception& e)
-    {
-        printf("exception: %s\n", e.what());
+            login.init(argv[1], argv[2]);
+            login.mainLoop();
+        }
+        catch (std::exception& e)
+        {
+            printf("exception: %s\n", e.what());
+        }
     }
     
 #ifdef EQP_WINDOWS

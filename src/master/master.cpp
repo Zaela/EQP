@@ -1,6 +1,8 @@
 
 #include "master.hpp"
 
+extern std::atomic_bool g_shutdown;
+
 Master::Master()
 : m_databaseThread(m_logWriter),
   m_database(m_databaseThread, m_logWriter),
@@ -74,7 +76,7 @@ void Master::mainLoop()
         m_ipcLogin.processOutQueue();
         m_ipcCharSelect.processOutQueue();
         
-        if (m_mainLoopEnd)
+        if (g_shutdown)
             return;
         
         Clock::sleepMilliseconds(50);
@@ -153,18 +155,39 @@ void Master::validateLoginRequest(IpcPacket& packet)
     
     LoginStruct::Request* req = (LoginStruct::Request*)packet.data();
     
-    //do validation here
+    int sourceId        = packet.sourceId();
+    uint32_t accountId  = req->accountId;
+    uint32_t serverId   = req->serverId;
     
-    LoginStruct::Response resp;
+    Query query;
     
-    resp.accountId  = req->accountId;
-    resp.serverId   = req->serverId;
-    resp.response   = 1;
+    m_database.prepare(query, "SELECT status, (suspended_until > strftime('%s', 'now')) FROM account WHERE login_server_id = ?",
+    [this, sourceId, accountId, serverId](Query& query)
+    {
+        int respValue = 1;
+        
+        while (query.select())
+        {
+            // Are they banned or suspended?
+            if (query.getInt(1) < 0)
+                respValue = -2;
+            else if (query.getInt(2) > 0)
+                respValue = -1;
+        }
+        
+        LoginStruct::Response resp;
     
-    if (packet.sourceId() == SourceId::CharSelect)
-        m_ipcCharSelect.push(ServerOp::LoginResponse, packet.sourceId(), sizeof(LoginStruct::Response), &resp);
-    else
-        m_ipcLogin.push(ServerOp::LoginResponse, packet.sourceId(), sizeof(LoginStruct::Response), &resp);
+        resp.accountId  = accountId;
+        resp.serverId   = serverId;
+        resp.response   = (int8_t)respValue;
+        
+        if (sourceId == SourceId::CharSelect)
+            m_ipcCharSelect.pushThreadSafe(ServerOp::LoginResponse, sourceId, sizeof(LoginStruct::Response), &resp);
+        else
+            m_ipcLogin.pushThreadSafe(ServerOp::LoginResponse, sourceId, sizeof(LoginStruct::Response), &resp);
+    });
+    
+    m_database.schedule(query);
 }
 
 /*================================================================================*\
@@ -196,4 +219,12 @@ pid_t Master::spawnProcess(const char* path, const char* arg1, const char* arg2)
     m_logWriter.log(Log::Info, "Spawned process \"%s\" with pid %i", path, pid);
     
     return pid;
+}
+
+void Master::shutDownChildProcesses()
+{
+    //m_ipcCharSelect.push(ServerOp::Shutdown, SourceId::Master, 0, nullptr);
+    m_ipcLogin.push(ServerOp::Shutdown, SourceId::Master, 0, nullptr);
+    
+    Clock::sleepMilliseconds(250);
 }

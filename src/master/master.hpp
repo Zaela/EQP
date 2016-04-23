@@ -18,6 +18,7 @@
 #ifdef EQP_LINUX
 # include <sys/types.h>
 # include <unistd.h>
+# include <signal.h>
 #endif
 
 #ifdef EQP_WINDOWS
@@ -77,6 +78,8 @@ public:
 
     void init();
     void mainLoop();
+    void shutdown() { m_mainLoopEnd = true; }
+    void shutDownChildProcesses();
 
     LogWriterMaster& logWriter() { return m_logWriter; }
 };
