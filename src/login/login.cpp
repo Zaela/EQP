@@ -25,7 +25,7 @@ Login::Login()
   m_databaseThread(m_logWriter),
   m_database(m_databaseThread, m_logWriter),
   m_logWriter(SourceId::Login, m_ipc),
-  m_serverLocked(true),
+  m_serverLocked(false),
   m_serverPlayerCount(0),
   m_socket(INVALID_SOCKET)
 {
@@ -99,7 +99,7 @@ void Login::mainLoop()
         // Check IPC input
         for (;;)
         {
-            SharedRingBuffer::Packet packet;
+            IpcPacket packet;
             
             if (!m_ipc.pop(packet))
                 break;
@@ -141,7 +141,7 @@ void Login::mainLoop()
     }
 }
 
-void Login::processIpc(SharedRingBuffer::Packet& packet)
+void Login::processIpc(IpcPacket& packet)
 {
     // There are only a very small number of opcodes that login cares about
     switch (packet.opcode())
@@ -150,6 +150,11 @@ void Login::processIpc(SharedRingBuffer::Packet& packet)
         m_shutdown = true;
         m_logWriter.log(Log::Info, "Received shutdown command from Master");
         break;
+    
+    case ServerOp::LoginResponse:
+        processPlayResponse(packet);
+        break;
+    
     default:
         break;
     }
@@ -186,6 +191,7 @@ void Login::processPacket(int len, IpAddress& addr)
         cli.progress        = Progress::None;
         cli.playSequence    = 0;
         cli.playAck         = 0;
+        cli.accountId       = 0;
         
         m_clients.push_back(cli);
         client = &m_clients.back();
@@ -592,7 +598,8 @@ login:
     
     send(client, &accepted, sizeof(accepted));
     
-    client->progress = Progress::LoggedIn;
+    client->progress    = Progress::LoggedIn;
+    client->accountId   = id;
 }
 
 void Login::processServerListRequest(Client* client, uint16_t seq)
@@ -694,9 +701,97 @@ void Login::processPlayRequest(byte* data, int len, Client* client, uint16_t seq
     
     AlignedReader r(data, len);
     
-    // sequence
+    // 'Sequence' -- needed in the eventual reply to the client
     client->playSequence    = r.uint16();
     client->playAck         = seq;
     
-    //ipc happens here...
+    LoginStruct::Request req;
+    
+    req.accountId   = (uint32_t)client->accountId;
+    req.serverId    = 1;
+    
+    // Send a login request to Master with the accountId
+    m_ipc.push(ServerOp::LoginRequest, SourceId::Login, sizeof(LoginStruct::Request), &req);
+}
+
+void Login::processPlayResponse(IpcPacket& packet)
+{
+#pragma pack(1)
+    struct PlayResponse : public AckPlus
+    {
+        uint8_t     sequence;
+        uint8_t     unknownA[9];
+        uint8_t     allowed;
+        uint16_t    messageId;
+        uint8_t     unknownB[3];
+        uint32_t    serverId;
+        
+        PlayResponse(uint16_t clientSeq, uint8_t dataSize, uint16_t serverSeq, uint16_t opcode)
+        : AckPlus(clientSeq, dataSize, serverSeq, opcode) { }
+    };
+#pragma pack()
+    
+    if (packet.length() < sizeof(LoginStruct::Response))
+        return;
+    
+    LoginStruct::Response* r = (LoginStruct::Response*)packet.data();
+    
+    int64_t accountId = (int64_t)r->accountId;
+    
+    // Find the client
+    Client* client = nullptr;
+    
+    for (Client& cli : m_clients)
+    {
+        if (cli.accountId == accountId)
+        {
+            client = &cli;
+            break;
+        }
+    }
+    
+    if (!client || client->progress < Progress::LoggedIn)
+        return;
+    
+    PlayResponse resp(client->playAck, sizeof(PlayResponse), client->sendAck++, LoginOp::PlayResponse);
+    AlignedWriter w = resp.writer();
+    
+    w.zeroAll();
+    
+    // sequence
+    w.uint8((uint8_t)client->playSequence);
+    // unknownA
+    w.advance(9);
+    // allowed
+    w.boolean((r->response == 1));
+    
+    uint16_t msgId;
+    
+    switch (r->response)
+    {
+    case 1:
+        msgId = 101;
+        break;
+    case 0:
+        msgId = 326;
+        break;
+    case -1:
+        msgId = 337;
+        break;
+    case -2:
+        msgId = 338;
+        break;
+    case -3:
+        msgId = 303;
+        break;
+    }
+    
+    // messageId
+    w.uint16(msgId);
+    // unknownB
+    w.advance(3);
+    // serverId
+    w.uint32(r->serverId);
+    
+    send(client, &resp, sizeof(PlayResponse));
 }

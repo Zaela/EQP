@@ -13,30 +13,12 @@
 #include "aligned.hpp"
 #include "source_id.hpp"
 #include "server_op.hpp"
+#include "packet_structs_login.hpp"
 #include <vector>
 #include <string>
 
 #define EQP_LOGIN_PORT 5999
 #define EQP_LOGIN_TIMEOUT_MILLISECONDS 60000
-
-/*
-struct PlayEverquestRequest_Struct
-{
-	uint16 Sequence;
-	uint32 Unknown1;
-	uint32 Unknown2;
-	uint32 ServerNumber;
-};
-
-struct PlayEverquestResponse_Struct {
-	uint8 Sequence;
-	uint8 Unknown1[9];
-	uint8 Allowed;
-	uint16 Message;
-	uint8 Unknown2[3];
-	uint32 ServerNumber;
-};
-*/
 
 class Login
 {
@@ -51,6 +33,7 @@ private:
         uint16_t playSequence;
         uint16_t playAck;
         uint64_t lastActivityTimestamp;
+        int64_t  accountId;
     };
     
     enum Progress : uint16_t
@@ -134,7 +117,7 @@ private:
 private:
     void initSocket();
 
-    void processIpc(SharedRingBuffer::Packet& packet);
+    void processIpc(IpcPacket& packet);
     void processProtocol(byte* data, int len, Client* client);
     void processCombined(byte* data, int len, Client* client);
     void processPacket(int len, IpAddress& addr);
@@ -152,6 +135,7 @@ private:
     void processCredentials(byte* data, int len, Client* client, uint16_t seq);
     void processServerListRequest(Client* client, uint16_t seq);
     void processPlayRequest(byte* data, int len, Client* client, uint16_t seq);
+    void processPlayResponse(IpcPacket& packet);
 
 public:
     Login();

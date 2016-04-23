@@ -7,8 +7,16 @@
 enum class ServerOp : uint32_t
 {
     None,
+    // Common
     Shutdown,
-    LogMessage
+    LogMessage,
+    // ZoneCluster
+    // Zone
+    // CharSelect
+    // Login
+    LoginRequest,
+    LoginResponse,
+    COUNT
 };
 
 #endif//_EQP_SERVER_OP_HPP_

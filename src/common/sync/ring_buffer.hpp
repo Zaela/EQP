@@ -77,4 +77,6 @@ public:
     bool push(ServerOp opcode, int sourceId, uint32_t len, const byte* data);
 };
 
+typedef SharedRingBuffer::Packet IpcPacket;
+
 #endif//_EQP_RING_BUFFER_HPP_

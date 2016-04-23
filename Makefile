@@ -67,7 +67,7 @@ HCOMMON_ALL+= $(HCOMMON_LOG)
 DIRCOMMON_NET= $(DIRCOMMON)net/
 BCOMMON_NET= $(BCOMMON)net/
 _OCOMMON_NET= 
-_HCOMMON_NET= eq_packet_protocol.hpp
+_HCOMMON_NET= eq_packet_protocol.hpp packet_structs_login.hpp
 OCOMMON_NET= $(patsubst %,$(BCOMMON_NET)%,$(_OCOMMON_NET))
 HCOMMON_NET= $(patsubst %,$(DIRCOMMON_NET)%,$(_HCOMMON_NET))
 

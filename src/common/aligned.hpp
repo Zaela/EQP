@@ -55,6 +55,7 @@ public:
 
     inline void zeroAll() { memset(m_buffer, 0, m_length); }
 
+    void boolean(bool value) { uint8((uint8_t)value); }
     void byte(::byte value) { uint8(value); }
     void int8(int8_t value) { uint8((uint8_t)value); }
     void uint8(uint8_t value);

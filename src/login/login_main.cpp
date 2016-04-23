@@ -6,7 +6,7 @@
 int main(int argc, const char** argv)
 {
     // argv[1] => path to ipc sharemem buffer
-    // argv[2] => server display name ?
+    // argv[2] => server display name
     
     if (argc < 3)
     {

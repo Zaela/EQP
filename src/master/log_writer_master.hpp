@@ -26,11 +26,11 @@ private:
     
     struct Op
     {
-        Opcode                      opcode;
-        SharedRingBuffer::Packet    packet;
+        Opcode      opcode;
+        IpcPacket   packet;
         
         Op(Opcode op) : opcode(op) { }
-        Op(Opcode op, SharedRingBuffer::Packet& p) : opcode(op), packet(std::move(p)) { }
+        Op(Opcode op, IpcPacket& p) : opcode(op), packet(std::move(p)) { }
         Op(Op&& o) { *this = std::move(o); }
         
         Op& operator=(Op&& o)
@@ -63,7 +63,7 @@ private:
 private:
     void threadLoop();
     static void threadProc(LogWriterMaster* writer);
-    void write(int sourceId, SharedRingBuffer::Packet& packet);
+    void write(int sourceId, IpcPacket& packet);
     void determineLogFileNameAndOpen(int sourceId);
     void close(int sourceId);
     void close(FILE* fp);
@@ -84,7 +84,7 @@ public:
 
     virtual void log(Log::Type type, const char* fmt, ...);
     virtual void log(Log::Type type, const char* fmt, va_list args);
-    void log(SharedRingBuffer::Packet& packet);
+    void log(IpcPacket& packet);
 };
 
 #endif//_EQP_LOG_WRITER_HPP_

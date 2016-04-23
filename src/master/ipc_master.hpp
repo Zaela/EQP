@@ -15,16 +15,16 @@ private:
     ShareMemCreator m_shareMem;
     IpcBuffer*      m_ipcBuffer;
 
-    AtomicMutex                             m_outQueueMutex;
-    std::vector<SharedRingBuffer::Packet>   m_outQueue;
+    AtomicMutex             m_outQueueMutex;
+    std::vector<IpcPacket>  m_outQueue;
 
 public:
     void init(const char* path);
 
-    bool pop(SharedRingBuffer::Packet& in);
+    bool pop(IpcPacket& in);
     // Not thread safe; should only be called from the main thread. Use pushThreadSafe() otherwise.
-    void push(ServerOp opcode, int sourceId, uint32_t len, const byte* data);
-    void pushThreadSafe(ServerOp opcode, int sourceId, uint32_t len, const byte* data);
+    void push(ServerOp opcode, int sourceId, uint32_t len, const void* data);
+    void pushThreadSafe(ServerOp opcode, int sourceId, uint32_t len, const void* data);
 
     void processOutQueue();
 };

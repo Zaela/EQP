@@ -27,14 +27,14 @@ void LogWriterMaster::init()
 
 void LogWriterMaster::openLogFileFor(int sourceId)
 {
-    SharedRingBuffer::Packet packet(ServerOp::None, sourceId, 0, nullptr);
+    IpcPacket packet(ServerOp::None, sourceId, 0, nullptr);
     Op op(Opcode::Open, packet);
     schedule(op);
 }
 
 void LogWriterMaster::closeLogFileFor(int sourceId)
 {
-    SharedRingBuffer::Packet packet(ServerOp::None, sourceId, 0, nullptr);
+    IpcPacket packet(ServerOp::None, sourceId, 0, nullptr);
     Op op(Opcode::Close, packet);
     schedule(op);
 }
@@ -55,7 +55,7 @@ void LogWriterMaster::log(Log::Type type, const char* fmt, va_list args)
     
     if (len)
     {
-        SharedRingBuffer::Packet packet(ServerOp::None, SourceId::Master, len, (byte*)message);
+        IpcPacket packet(ServerOp::None, SourceId::Master, len, (byte*)message);
         log(packet);
         
         if (type == Log::Fatal || type == Log::None)
@@ -84,8 +84,11 @@ void LogWriterMaster::log(Log::Type type, const char* fmt, va_list args)
     }
 }
 
-void LogWriterMaster::log(SharedRingBuffer::Packet& packet)
+void LogWriterMaster::log(IpcPacket& packet)
 {
+    if (!packet.length() || !packet.data())
+        return;
+    
     Op op(Opcode::Write, packet);
     schedule(op);
 }
@@ -160,7 +163,7 @@ void LogWriterMaster::threadLoop()
     }
 }
 
-void LogWriterMaster::write(int sourceId, SharedRingBuffer::Packet& packet)
+void LogWriterMaster::write(int sourceId, IpcPacket& packet)
 {
     FILE* fp = nullptr;
     
@@ -229,7 +232,7 @@ void LogWriterMaster::determineLogFileNameAndOpen(int sourceId)
             {
                 pos += (size_t)wrote;
                 
-                SharedRingBuffer::Packet packet(ServerOp::None, SourceId::Master, pos, (byte*)message);
+                IpcPacket packet(ServerOp::None, SourceId::Master, pos, (byte*)message);
                 m_threadProcessQueue.emplace_back(Opcode::Write, packet);
             }
         }

@@ -109,10 +109,10 @@ void Master::ipcThreadLoop()
 
 void Master::processIpcInput(IpcMaster& ipc)
 {
-    SharedRingBuffer::Packet packet;
-    
     for (;;)
     {
+        IpcPacket packet;
+        
         if (!ipc.pop(packet))
             return;
         
@@ -120,17 +120,51 @@ void Master::processIpcInput(IpcMaster& ipc)
     }
 }
 
-void Master::processIpcInput(SharedRingBuffer::Packet& packet)
+void Master::processIpcInput(IpcPacket& packet)
 {
     switch (packet.opcode())
     {
+    // Common
     case ServerOp::LogMessage:
         m_logWriter.log(packet);
+        break;
+    
+    // ZoneCluster
+    // Zone
+    // CharSelect
+    // Login
+    case ServerOp::LoginRequest:
+        validateLoginRequest(packet);
         break;
     
     default:
         break;
     }
+}
+
+/*================================================================================*\
+** IPC handlers
+\*================================================================================*/
+
+void Master::validateLoginRequest(IpcPacket& packet)
+{
+    if (packet.length() < sizeof(LoginStruct::Request))
+        return;
+    
+    LoginStruct::Request* req = (LoginStruct::Request*)packet.data();
+    
+    //do validation here
+    
+    LoginStruct::Response resp;
+    
+    resp.accountId  = req->accountId;
+    resp.serverId   = req->serverId;
+    resp.response   = 1;
+    
+    if (packet.sourceId() == SourceId::CharSelect)
+        m_ipcCharSelect.push(ServerOp::LoginResponse, packet.sourceId(), sizeof(LoginStruct::Response), &resp);
+    else
+        m_ipcLogin.push(ServerOp::LoginResponse, packet.sourceId(), sizeof(LoginStruct::Response), &resp);
 }
 
 /*================================================================================*\

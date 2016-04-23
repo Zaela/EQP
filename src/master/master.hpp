@@ -13,6 +13,7 @@
 #include "server_op.hpp"
 #include "atomic_mutex.hpp"
 #include "clock.hpp"
+#include "packet_structs_login.hpp"
 
 #ifdef EQP_LINUX
 # include <sys/types.h>
@@ -63,7 +64,10 @@ private:
     void ipcThreadLoop();
     static void ipcThreadProc(Master* master);
     void processIpcInput(IpcMaster& ipc);
-    void processIpcInput(SharedRingBuffer::Packet& packet);
+    void processIpcInput(IpcPacket& packet);
+
+    // IPC handlers
+    void validateLoginRequest(IpcPacket& packet);
 
     pid_t spawnProcess(const char* path, const char* arg1 = nullptr, const char* arg2 = nullptr);
 
