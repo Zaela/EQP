@@ -178,7 +178,7 @@ void Login::processPacket(int len, IpAddress& addr)
         cli.port        = port;
         cli.recvAck     = 0;
         cli.sendAck     = 0;
-        cli.progress    = 0;
+        cli.progress    = Progress::None;
         
         m_clients.push_back(cli);
         client = &m_clients.back();
@@ -346,7 +346,7 @@ void Login::sendSessionResponse(Client* client)
     
     send(client, &resp, sizeof(SessionResponse));
     
-    client->progress = 1;
+    client->progress = Progress::Session;
 }
 
 void Login::send(uint32_t ipAddress, uint16_t port, const void* data, uint32_t len)
@@ -380,7 +380,7 @@ void Login::processLoginRequest(Client* client, uint16_t seq)
     };
 #pragma pack()
         
-    if (client->progress != 1)
+    if (client->progress != Progress::Session)
         return;
     
     Reply reply(seq, sizeof(Reply), client->sendAck++, LoginOp::ChatMessage);
@@ -395,13 +395,13 @@ void Login::processLoginRequest(Client* client, uint16_t seq)
     
     send(client, &reply, sizeof(reply));
     
-    client->progress = 2;
+    client->progress = Progress::LoginRequested;
 }
 
 void Login::processCredentials(byte* data, int len, Client* client, uint16_t seq)
 {
     // Must be at least 10 + encrypted portion (min 8)
-    if (len < 18 || (uint32_t)len > BUFFER_SIZE || client->progress != 2)
+    if (len < 18 || (uint32_t)len > BUFFER_SIZE || client->progress != Progress::LoginRequested)
         return;
     
     data += 10;
@@ -581,7 +581,7 @@ login:
     
     send(client, &accepted, sizeof(accepted));
     
-    client->progress = 3;
+    client->progress = Progress::LoggedIn;
 }
 
 void Login::processServerListRequest(Client* client, uint16_t seq)
@@ -603,7 +603,7 @@ void Login::processServerListRequest(Client* client, uint16_t seq)
     };
 #pragma pack()
         
-    if (client->progress < 3)
+    if (client->progress < Progress::LoggedIn)
         return;
     
     // Need to do some gymnastics to figure out the size, plus limit the packet data to 255 bytes (to fit size in 1 byte for combined)
@@ -664,5 +664,5 @@ void Login::processServerListRequest(Client* client, uint16_t seq)
     
     send(client, list, size + 6); // Count the 6 byte packet header here
     
-    client->progress = 4;
+    client->progress = Progress::ReceivedServerList;
 }

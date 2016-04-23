@@ -51,6 +51,15 @@ private:
         uint64_t lastActivityTimestamp;
     };
     
+    enum Progress : uint16_t
+    {
+        None,
+        Session,
+        LoginRequested,
+        LoggedIn,
+        ReceivedServerList
+    };
+    
     static const int BUFFER_SIZE = 1024;
     
     enum LoginOp : uint16_t
