@@ -20,63 +20,6 @@
 #define EQP_LOGIN_TIMEOUT_MILLISECONDS 60000
 
 /*
-struct LoginLoginRequest_Struct {
-	short unknown1;
-	short unknown2;
-	short unknown3;
-	short unknown4;
-	short unknown5;
-	char unknown6[16];
-};
-
-struct LoginAccepted_Struct {
-	short unknown1;
-	short unknown2;
-	short unknown3;
-	short unknown4;
-	short unknown5;
-	char encrypt[80];
-};
-
-struct LoginFailedAttempts_Struct
-{
-	char message; //0x01
-	char unknown2[7]; //0x00
-	uint32 lsid;
-	char key[11]; //10 char + null term;
-	uint32 failed_attempts;
-	char unknown3[4];	//0x00, 0x00, 0x00, 0x03
-	char unknown4[4];	//0x00, 0x00, 0x00, 0x02
-	char unknown5[4];	//0xe7, 0x03, 0x00, 0x00
-	char unknown6[4];	//0xff, 0xff, 0xff, 0xff
-	char unknown7[4];	//0xa0, 0x05, 0x00, 0x00
-	char unknown8[4];	//0x00, 0x00, 0x00, 0x02
-	char unknown9[4];	//0xff, 0x03, 0x00, 0x00
-	char unknown10[4];	//0x00, 0x00, 0x00, 0x00
-	char unknown11[4];	//0x63, 0x00, 0x00, 0x00
-	char unknown12[4];	//0x01, 0x00, 0x00, 0x00
-	char unknown13[4];	//0x00, 0x00, 0x00, 0x00
-	char unknown14[4];	//0x00, 0x00, 0x00, 0x00
-};
-
-struct LoginLoginFailed_Struct {
-	short unknown1;
-	short unknown2;
-	short unknown3;
-	short unknown4;
-	short unknown5;
-	char unknown6[74];
-};
-
-struct ServerListHeader_Struct {
-
-	uint32 Unknown1;
-	uint32 Unknown2;
-	uint32 Unknown3;
-	uint32 Unknown4;
-	uint32 NumberOfServers;
-};
-
 struct PlayEverquestRequest_Struct
 {
 	uint16 Sequence;
@@ -93,11 +36,6 @@ struct PlayEverquestResponse_Struct {
 	uint8 Unknown2[3];
 	uint32 ServerNumber;
 };
-
-static const unsigned char FailedLoginResponseData[] = {
-	0xf6, 0x85, 0x9c, 0x23, 0x57, 0x7e, 0x3e, 0x55, 0xb3, 0x4c, 0xf8, 0xc8, 0xcb, 0x77, 0xd5, 0x16,
-	0x09, 0x7a, 0x63, 0xdc, 0x57, 0x7e, 0x3e, 0x55, 0xb3, 0x4c, 0xf8, 0xc8, 0xcb, 0x77, 0xd5, 0x16,
-	0x09, 0x7a, 0x63, 0xdc, 0x57, 0x7e, 0x3e, 0x55, 0xb3 };
 */
 
 class Login
@@ -171,7 +109,9 @@ private:
     LogWriterCommon m_logWriter;
     IpcRemote       m_ipc;
 
+    bool            m_serverLocked;
     std::string     m_serverName;
+    uint32_t        m_serverPlayerCount;
 
     std::vector<Client> m_clients;
 
@@ -191,7 +131,6 @@ private:
     void checkForTimeouts(uint64_t timestamp);
     void swapAndPop(Client* client);
 
-    //void sendAck(uint16_t seq, Client* client);
     void sendSessionResponse(Client* client);
     void send(uint32_t ipAddress, uint16_t port, const void* data, uint32_t len);
     void send(Client* client, const void* data, uint32_t len);

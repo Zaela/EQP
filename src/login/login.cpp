@@ -25,9 +25,12 @@ Login::Login()
   m_databaseThread(m_logWriter),
   m_database(m_databaseThread, m_logWriter),
   m_logWriter(SourceId::Login, m_ipc),
+  m_serverLocked(true),
+  m_serverPlayerCount(0),
   m_socket(INVALID_SOCKET)
 {
-    
+    //temp
+    m_serverName = "The EQP Test Server";
 }
 
 Login::~Login()
@@ -283,15 +286,84 @@ void Login::processPacket(byte* data, int len, Client* client)
     case LoginOp::ServerListRequest:
     {
 #pragma pack(1)
-        struct ServerList
+        struct ServerList : public AckPlus
         {
-            AckPlus ackPlus;
-            //other fields...
+            uint32_t    unknown[4];
+            uint32_t    count;
+            // Individual server
+            char        ipAddress[sizeof("127.0.0.1")];
+            uint32_t    listingType;
+            uint32_t    runtimeId;
+            // Variable length string for the server name here, followed by "EN" and "US", all null terminated
+            // Followed by two uint32's for status and player count
+            
+            ServerList(uint16_t clientSeq, uint8_t dataSize, uint16_t serverSeq, uint16_t opcode)
+            : AckPlus(clientSeq, dataSize, serverSeq, opcode) { }
         };
 #pragma pack()
         
-        if (client->progress != 3)
+        if (client->progress < 3)
             break;
+        
+        // Need to do some gymnastics to figure out the size, plus limit the packet data to 255 bytes (to fit size in 1 byte for combined)
+        // so that we won't have to implement fragmented packets here
+        
+        // Inidividual packet header is 6 bytes
+        uint32_t size = 6 + sizeof(ServerList) - sizeof(AckPlus) + 14;
+        uint32_t slen = m_serverName.size() + 1;
+        
+        if ((size + slen) > 255)
+        {
+            slen = 255 - size;
+            size = 255;
+        }
+        else
+        {
+            size += slen;
+        }
+        
+        // Don't count the 6 byte packet header size for the AckPlus constructor call, but do count the size of AckPlus
+        size = size - 6 + sizeof(AckPlus);
+        
+        byte data[512];
+        ServerList* list = (ServerList*)data;
+        
+        // Call constructor
+        new (list) ServerList(seq, size, client->sendAck++, LoginOp::ServerListResponse);
+        
+        AlignedWriter w = list->writer();
+        
+        // unknown[4]
+        w.uint32(0x00000004);
+        w.uint32(0x00000000);
+        w.uint32(0x01650000);
+        w.uint32(0x00000000);
+        
+        // count
+        w.uint32(1);
+        
+        // ipAddress
+        w.string("127.0.0.1", sizeof("127.0.0.1"));
+        // listingType
+        w.uint32(0x00000030); // Legends, why not
+        // runtimeId
+        w.uint32(1);
+        // server name -- last byte may not be null terminator due to above gymnastics, so don't write it
+        w.string(m_serverName.c_str(), slen - 1);
+        // explicit null terminator
+        w.byte(0);
+        // "EN"
+        w.string("EN", sizeof("EN"));
+        // "US"
+        w.string("US", sizeof("US"));
+        // server status -- 1 = down, 2 = up, 4 = locked
+        w.uint32(m_serverLocked ? 0x04 : 0x02);
+        // player count
+        w.uint32(m_serverPlayerCount);
+        
+        send(client, list, size + 6); // Count the 6 byte packet header here
+        
+        client->progress = 4;
         break;
     }
     
@@ -336,24 +408,7 @@ void Login::swapAndPop(Client* client)
     
     m_clients.pop_back();
 }
-/*
-void Login::sendAck(uint16_t seq, Client* client)
-{
-#pragma pack(1)
-    struct Ack
-    {
-        uint16_t opcode;
-        uint16_t seq;
-    };
-#pragma pack()
-    
-    Ack ack;
-    ack.opcode  = toNetworkShort(EQProtocol::Ack);
-    ack.seq     = toNetworkShort(seq);
-    
-    send(client, &ack, sizeof(Ack));
-}
-*/
+
 void Login::sendSessionResponse(Client* client)
 {
 #pragma pack(1)
