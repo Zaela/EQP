@@ -202,18 +202,21 @@ void Login::processProtocol(byte* data, int len, Client* client)
     switch (opcode)
     {
     case EQProtocol::SessionRequest:
-        client->progress = 1;
         sendSessionResponse(client);
         break;
+    
     case EQProtocol::Combined:
         processCombined(data, len, client);
         break;
+    
     case EQProtocol::Packet:
         processPacket(data, len, client);
         break;
+    
     case EQProtocol::SessionDisconnect:
         swapAndPop(client);
         break;
+    
     default:
         break;
     }
@@ -247,125 +250,16 @@ void Login::processPacket(byte* data, int len, Client* client)
     switch (opcode)
     {
     case LoginOp::LoginRequest:
-    {
-#pragma pack(1)
-        struct Reply
-        {
-            AckPlus ackPlus;
-            byte    data[16];
-            byte    message[12];
-            
-            Reply(uint16_t clientSeq, uint8_t dataSize, uint16_t serverSeq, uint16_t opcode)
-            : ackPlus(clientSeq, dataSize, serverSeq, opcode) { }
-        };
-#pragma pack()
-        
-        if (client->progress != 1)
-            break;
-        
-        Reply reply(seq, sizeof(Reply), client->sendAck++, LoginOp::ChatMessage);
-        
-        memset(reply.data, 0, sizeof(reply.data));
-        
-        reply.data[ 0] = 0x02;
-        reply.data[10] = 0x01;
-        reply.data[11] = 0x65;
-        
-        memcpy(reply.message, "ChatMessage", sizeof(reply.message));
-        
-        send(client, &reply, sizeof(reply));
-        
-        client->progress = 2;
+        processLoginRequest(client, seq);
         break;
-    }
     
     case LoginOp::LoginCredentials:
         processCredentials(data, len, client, seq);
         break;
     
     case LoginOp::ServerListRequest:
-    {
-#pragma pack(1)
-        struct ServerList : public AckPlus
-        {
-            uint32_t    unknown[4];
-            uint32_t    count;
-            // Individual server
-            char        ipAddress[sizeof("127.0.0.1")];
-            uint32_t    listingType;
-            uint32_t    runtimeId;
-            // Variable length string for the server name here, followed by "EN" and "US", all null terminated
-            // Followed by two uint32's for status and player count
-            
-            ServerList(uint16_t clientSeq, uint8_t dataSize, uint16_t serverSeq, uint16_t opcode)
-            : AckPlus(clientSeq, dataSize, serverSeq, opcode) { }
-        };
-#pragma pack()
-        
-        if (client->progress < 3)
-            break;
-        
-        // Need to do some gymnastics to figure out the size, plus limit the packet data to 255 bytes (to fit size in 1 byte for combined)
-        // so that we won't have to implement fragmented packets here
-        
-        // Inidividual packet header is 6 bytes
-        uint32_t size = 6 + sizeof(ServerList) - sizeof(AckPlus) + 14;
-        uint32_t slen = m_serverName.size() + 1;
-        
-        if ((size + slen) > 255)
-        {
-            slen = 255 - size;
-            size = 255;
-        }
-        else
-        {
-            size += slen;
-        }
-        
-        // Don't count the 6 byte packet header size for the AckPlus constructor call, but do count the size of AckPlus
-        size = size - 6 + sizeof(AckPlus);
-        
-        byte data[512];
-        ServerList* list = (ServerList*)data;
-        
-        // Call constructor
-        new (list) ServerList(seq, size, client->sendAck++, LoginOp::ServerListResponse);
-        
-        AlignedWriter w = list->writer();
-        
-        // unknown[4]
-        w.uint32(0x00000004);
-        w.uint32(0x00000000);
-        w.uint32(0x01650000);
-        w.uint32(0x00000000);
-        
-        // count
-        w.uint32(1);
-        
-        // ipAddress
-        w.string("127.0.0.1", sizeof("127.0.0.1"));
-        // listingType
-        w.uint32(0x00000030); // Legends, why not
-        // runtimeId
-        w.uint32(1);
-        // server name -- last byte may not be null terminator due to above gymnastics, so don't write it
-        w.string(m_serverName.c_str(), slen - 1);
-        // explicit null terminator
-        w.byte(0);
-        // "EN"
-        w.string("EN", sizeof("EN"));
-        // "US"
-        w.string("US", sizeof("US"));
-        // server status -- 1 = down, 2 = up, 4 = locked
-        w.uint32(m_serverLocked ? 0x04 : 0x02);
-        // player count
-        w.uint32(m_serverPlayerCount);
-        
-        send(client, list, size + 6); // Count the 6 byte packet header here
-        
-        client->progress = 4;
+        processServerListRequest(client, seq);
         break;
-    }
     
     default:
         break;
@@ -451,6 +345,8 @@ void Login::sendSessionResponse(Client* client)
     w.uint32(req.uint32());
     
     send(client, &resp, sizeof(SessionResponse));
+    
+    client->progress = 1;
 }
 
 void Login::send(uint32_t ipAddress, uint16_t port, const void* data, uint32_t len)
@@ -468,6 +364,38 @@ void Login::send(uint32_t ipAddress, uint16_t port, const void* data, uint32_t l
 void Login::send(Client* client, const void* data, uint32_t len)
 {
     send(client->ipAddress, client->port, data, len);
+}
+
+void Login::processLoginRequest(Client* client, uint16_t seq)
+{
+#pragma pack(1)
+    struct Reply
+    {
+        AckPlus ackPlus;
+        byte    data[16];
+        byte    message[12];
+        
+        Reply(uint16_t clientSeq, uint8_t dataSize, uint16_t serverSeq, uint16_t opcode)
+        : ackPlus(clientSeq, dataSize, serverSeq, opcode) { }
+    };
+#pragma pack()
+        
+    if (client->progress != 1)
+        return;
+    
+    Reply reply(seq, sizeof(Reply), client->sendAck++, LoginOp::ChatMessage);
+    
+    memset(reply.data, 0, sizeof(reply.data));
+    
+    reply.data[ 0] = 0x02;
+    reply.data[10] = 0x01;
+    reply.data[11] = 0x65;
+    
+    memcpy(reply.message, "ChatMessage", sizeof(reply.message));
+    
+    send(client, &reply, sizeof(reply));
+    
+    client->progress = 2;
 }
 
 void Login::processCredentials(byte* data, int len, Client* client, uint16_t seq)
@@ -654,4 +582,87 @@ login:
     send(client, &accepted, sizeof(accepted));
     
     client->progress = 3;
+}
+
+void Login::processServerListRequest(Client* client, uint16_t seq)
+{
+#pragma pack(1)
+    struct ServerList : public AckPlus
+    {
+        uint32_t    unknown[4];
+        uint32_t    count;
+        // Individual server
+        char        ipAddress[sizeof("127.0.0.1")];
+        uint32_t    listingType;
+        uint32_t    runtimeId;
+        // Variable length string for the server name here, followed by "EN" and "US", all null terminated
+        // Followed by two uint32's for status and player count
+        
+        ServerList(uint16_t clientSeq, uint8_t dataSize, uint16_t serverSeq, uint16_t opcode)
+        : AckPlus(clientSeq, dataSize, serverSeq, opcode) { }
+    };
+#pragma pack()
+        
+    if (client->progress < 3)
+        return;
+    
+    // Need to do some gymnastics to figure out the size, plus limit the packet data to 255 bytes (to fit size in 1 byte for combined)
+    // so that we won't have to implement fragmented packets here
+    
+    // Inidividual packet header is 6 bytes
+    uint32_t size = 6 + sizeof(ServerList) - sizeof(AckPlus) + 14;
+    uint32_t slen = m_serverName.size() + 1;
+    
+    if ((size + slen) > 255)
+    {
+        slen = 255 - size;
+        size = 255;
+    }
+    else
+    {
+        size += slen;
+    }
+    
+    // Don't count the 6 byte packet header size for the AckPlus constructor call, but do count the size of AckPlus
+    size = size - 6 + sizeof(AckPlus);
+    
+    byte data[512];
+    ServerList* list = (ServerList*)data;
+    
+    // Call constructor
+    new (list) ServerList(seq, size, client->sendAck++, LoginOp::ServerListResponse);
+    
+    AlignedWriter w = list->writer();
+    
+    // unknown[4]
+    w.uint32(0x00000004);
+    w.uint32(0x00000000);
+    w.uint32(0x01650000);
+    w.uint32(0x00000000);
+    
+    // count
+    w.uint32(1);
+    
+    // ipAddress
+    w.string("127.0.0.1", sizeof("127.0.0.1"));
+    // listingType
+    w.uint32(0x00000030); // Legends, why not
+    // runtimeId
+    w.uint32(1);
+    // server name -- last byte may not be null terminator due to above gymnastics, so don't write it
+    w.string(m_serverName.c_str(), slen - 1);
+    // explicit null terminator
+    w.byte(0);
+    // "EN"
+    w.string("EN", sizeof("EN"));
+    // "US"
+    w.string("US", sizeof("US"));
+    // server status -- 1 = down, 2 = up, 4 = locked
+    w.uint32(m_serverLocked ? 0x04 : 0x02);
+    // player count
+    w.uint32(m_serverPlayerCount);
+    
+    send(client, list, size + 6); // Count the 6 byte packet header here
+    
+    client->progress = 4;
 }

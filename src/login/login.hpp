@@ -136,7 +136,10 @@ private:
     void send(Client* client, const void* data, uint32_t len);
 
     LoginCrypto& crypto() { return m_crypto; }
+    
+    void processLoginRequest(Client* client, uint16_t seq);
     void processCredentials(byte* data, int len, Client* client, uint16_t seq);
+    void processServerListRequest(Client* client, uint16_t seq);
 
 public:
     Login();
