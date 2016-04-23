@@ -24,7 +24,7 @@ DIRCOMMON= src/common/
 BCOMMON= build/$(BUILDTYPE)/common/
 _OCOMMON= \
  file.o   exception.o   aligned.o
-_HCOMMON= define.hpp terminal.hpp bit.hpp log_writer.hpp \
+_HCOMMON= define.hpp terminal.hpp bit.hpp \
  file.hpp exception.hpp aligned.hpp
 OCOMMON= $(patsubst %,$(BCOMMON)%,$(_OCOMMON))
 HCOMMON= $(patsubst %,$(DIRCOMMON)%,$(_HCOMMON))
@@ -52,8 +52,8 @@ HCOMMON_ALL+= $(HCOMMON_DB)
 ##############################################################################
 DIRCOMMON_LOG= $(DIRCOMMON)log/
 BCOMMON_LOG= $(BCOMMON)log/
-_OCOMMON_LOG= log_writer_common.o
-_HCOMMON_LOG= log_writer_common.hpp
+_OCOMMON_LOG= log_writer_common.o   log_writer.o
+_HCOMMON_LOG= log_writer_common.hpp log_writer.hpp
 OCOMMON_LOG= $(patsubst %,$(BCOMMON_LOG)%,$(_OCOMMON_LOG))
 HCOMMON_LOG= $(patsubst %,$(DIRCOMMON_LOG)%,$(_HCOMMON_LOG))
 

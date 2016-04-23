@@ -29,8 +29,7 @@ Login::Login()
   m_serverPlayerCount(0),
   m_socket(INVALID_SOCKET)
 {
-    //temp
-    m_serverName = "The EQP Test Server";
+
 }
 
 Login::~Login()
@@ -39,16 +38,18 @@ Login::~Login()
         closesocket(m_socket);
 }
 
-void Login::init(const char* ipcPath)
+void Login::init(const char* ipcPath, const char* serverName)
 {
+    // Shared Memory IPC area
+    // Must be done before anything that tries to log, since log messages go through IPC
+    m_ipc.init(ipcPath);
+    
     // Not initializing the DatabaseThread since we aren't actually using background
     // query processing; not point in being too efficient, may as well keep everything
     // single-threaded.
     m_database.init(EQP_SQLITE_MAIN_DATABASE_PATH, EQP_SQLITE_MAIN_SCHEMA_PATH);
     
-    // Shared Memory IPC area
-    (void)ipcPath;
-    //m_ipc.init(ipcPath);
+    m_serverName = serverName;
     
     initSocket();
 }
@@ -78,6 +79,8 @@ void Login::initSocket()
     
     if (bind(m_socket, (struct sockaddr*)&addr, sizeof(IpAddress)))
         throw Exception("[Login::initSocket] bind() failed");
+    
+    m_logWriter.log(Log::Info, "Listening for UDP packets on port %i", EQP_LOGIN_PORT);
 }
 
 void Login::mainLoop()
@@ -90,8 +93,11 @@ void Login::mainLoop()
     
     for (;;)
     {
+        // Check pending IPC output
+        m_ipc.processOutQueue();
+        
         // Check IPC input
-        /*for (;;)
+        for (;;)
         {
             SharedRingBuffer::Packet packet;
             
@@ -99,19 +105,18 @@ void Login::mainLoop()
                 break;
             
             processIpc(packet);
-        }*/
+        }
         
         // Check socket input
         for (;;)
         {
             int len = ::recvfrom(m_socket, (char*)m_sockBuffer, BUFFER_SIZE, 0, (struct sockaddr*)&addr, &addrLen);
             
-            if (len == 0)
-                break;
-            
-            if (len < 0)
+            if (len <= 0)
             {
-                m_logWriter.log(Log::Error, "[Login::mainLoop] recvfrom() failed");
+                int err = errno;
+                if (err != EAGAIN)
+                    m_logWriter.log(Log::Error, "[Login::mainLoop] recvfrom() failed, errno %i", err);
                 break;
             }
             

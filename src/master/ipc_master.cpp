@@ -5,16 +5,18 @@ void IpcMaster::init(const char* path)
 {
     m_shareMem.create(path, sizeof(IpcBuffer));
     m_ipcBuffer = (IpcBuffer*)m_shareMem.getMemory();
+    
+    m_ipcBuffer->init();
 }
 
 bool IpcMaster::pop(SharedRingBuffer::Packet& in)
 {
-    return m_ipcBuffer->remote().pop(in);
+    return m_ipcBuffer->master().pop(in);
 }
 
 void IpcMaster::push(ServerOp opcode, int sourceId, uint32_t len, const byte* data)
 {
-    if (m_ipcBuffer->master().push(opcode, sourceId, len, data))
+    if (m_ipcBuffer->remote().push(opcode, sourceId, len, data))
         return;
     
     std::lock_guard<AtomicMutex> lock(m_outQueueMutex);
@@ -30,6 +32,9 @@ void IpcMaster::pushThreadSafe(ServerOp opcode, int sourceId, uint32_t len, cons
 void IpcMaster::processOutQueue()
 {
     std::lock_guard<AtomicMutex> lock(m_outQueueMutex);
+    
+    if (m_outQueue.empty())
+        return;
     
     uint32_t i = 0;
     

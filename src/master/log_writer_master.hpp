@@ -13,8 +13,6 @@
 #include "terminal.hpp"
 #include <vector>
 #include <string>
-#include <ctime>
-#include <time.h>
 
 class LogWriterMaster : public LogWriter
 {

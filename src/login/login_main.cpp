@@ -5,11 +5,14 @@
 
 int main(int argc, const char** argv)
 {
-    (void)argc;
-    (void)argv;
-    
     // argv[1] => path to ipc sharemem buffer
     // argv[2] => server display name ?
+    
+    if (argc < 3)
+    {
+        printf("LOGIN expected 3 args, got %i. Aborting.\n", argc);
+        return 1;
+    }
     
     Login login;
     
@@ -23,7 +26,7 @@ int main(int argc, const char** argv)
         }
 #endif
         
-        login.init(EQP_IPC_LOGIN);
+        login.init(argv[1], argv[2]);
         login.mainLoop();
     }
     catch (std::exception& e)

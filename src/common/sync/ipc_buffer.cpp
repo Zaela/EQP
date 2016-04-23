@@ -25,6 +25,7 @@ void IpcRemote::push(ServerOp opcode, int sourceId, uint32_t len, const byte* da
     if (m_ipcBuffer->master().push(opcode, sourceId, len, data))
     {
         m_masterSemaphore.trigger();
+        //printf("wrote IPC\n");
         return;
     }
     

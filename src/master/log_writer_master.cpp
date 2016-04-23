@@ -30,8 +30,6 @@ void LogWriterMaster::openLogFileFor(int sourceId)
     SharedRingBuffer::Packet packet(ServerOp::None, sourceId, 0, nullptr);
     Op op(Opcode::Open, packet);
     schedule(op);
-    
-    log(Log::None, "==== Log File Opened ====", sourceId);
 }
 
 void LogWriterMaster::closeLogFileFor(int sourceId)
@@ -51,74 +49,38 @@ void LogWriterMaster::log(Log::Type type, const char* fmt, ...)
 
 void LogWriterMaster::log(Log::Type type, const char* fmt, va_list args)
 {
-    char message[2048];
+    char message[LogWriter::MESSAGE_SIZE];
     
-    time_t rawTime      = time(nullptr);
-    struct tm* curTime  = localtime(&rawTime);
+    uint32_t len = constructMessage(message, type, fmt, args);
     
-    size_t pos = strftime(message, sizeof(message), "[%Y-%m-%d : %H:%M:%S]", curTime);
-    
-    if (pos == 0)
-        throw Exception("[LogWriterMaster::log] strftime() failed");
-    
-    int wrote = 0;
-    
-    switch (type)
+    if (len)
     {
-    case Log::Fatal:
-        wrote = snprintf(message + pos, sizeof(message) - pos, "[FATAL] ");
-        break;
-    case Log::Error:
-        wrote = snprintf(message + pos, sizeof(message) - pos, "[ERROR] ");
-        break;
-    case Log::Info:
-        wrote = snprintf(message + pos, sizeof(message) - pos, "[INFO] ");
-        break;
-    case Log::SQL:
-        wrote = snprintf(message + pos, sizeof(message) - pos, "[SQL] ");
-        break;
-    case Log::None:
-        wrote = snprintf(message + pos, sizeof(message) - pos, " ");
-        break;
-    }
-    
-    if (wrote > 0 && (size_t)wrote < (sizeof(message) - pos))
-    {
-        pos += (size_t)wrote;
+        SharedRingBuffer::Packet packet(ServerOp::None, SourceId::Master, len, (byte*)message);
+        log(packet);
         
-        wrote = vsnprintf(message + pos, sizeof(message) - pos, fmt, args);
+        if (type == Log::Fatal || type == Log::None)
+            return;
         
-        if (wrote > 0 && (size_t)wrote < (sizeof(message) - pos))
+        std::lock_guard<AtomicMutex> lock(m_printfMutex);
+        switch (type)
         {
-            pos += (size_t)wrote;
-            
-            SharedRingBuffer::Packet packet(ServerOp::None, SourceId::Master, pos, (byte*)message);
-            log(packet);
-            
-            if (type == Log::Fatal || type == Log::None)
-                return;
-            
-            std::lock_guard<AtomicMutex> lock(m_printfMutex);
-            switch (type)
-            {
-            case Log::Error:
-                printf(TERM_RED);
-                break;
-            
-            case Log::Info:
-                printf(TERM_YELLOW);
-                break;
-            
-            case Log::SQL:
-                printf(TERM_DARK_GREEN);
-                break;
-            
-            default:
-                break;
-            }
-            
-            printf("[%s\n" TERM_DEFAULT, message + 14); // 14 to skip the year-month-day part
+        case Log::Error:
+            printf(TERM_RED);
+            break;
+        
+        case Log::Info:
+            printf(TERM_YELLOW);
+            break;
+        
+        case Log::SQL:
+            printf(TERM_DARK_GREEN);
+            break;
+        
+        default:
+            break;
         }
+        
+        printf("[%s\n" TERM_DEFAULT, message + 14); // 14 to skip the year-month-day part
     }
 }
 
@@ -215,6 +177,7 @@ void LogWriterMaster::write(int sourceId, SharedRingBuffer::Packet& packet)
     {
         ::fwrite(packet.data(), sizeof(byte), packet.length(), fp);
         ::fputc('\n', fp);
+        ::fflush(fp);
     }
 }
 
@@ -255,7 +218,8 @@ void LogWriterMaster::determineLogFileNameAndOpen(int sourceId)
         time_t rawTime      = time(nullptr);
         struct tm* curTime  = localtime(&rawTime);
         
-        size_t pos = strftime(message, sizeof(message), "[%c][ERROR][LogWriterMaster::determineLogFileNameAndOpen] Could not open file for appending: ", curTime);
+        size_t pos = strftime(message, sizeof(message),
+            "[%Y-%m-%d : %H:%M:%S][ERROR][LogWriterMaster::determineLogFileNameAndOpen] Could not open file for appending: ", curTime);
         
         if (pos != 0)
         {
@@ -269,6 +233,8 @@ void LogWriterMaster::determineLogFileNameAndOpen(int sourceId)
                 m_threadProcessQueue.emplace_back(Opcode::Write, packet);
             }
         }
+        
+        return;
     }
     
     LogFile lf;
@@ -277,6 +243,19 @@ void LogWriterMaster::determineLogFileNameAndOpen(int sourceId)
     lf.file     = fp;
     
     m_logFiles.push_back(lf);
+    
+    char message[2048];
+    
+    time_t rawTime      = time(nullptr);
+    struct tm* curTime  = localtime(&rawTime);
+    
+    size_t pos = strftime(message, sizeof(message), "[%Y-%m-%d : %H:%M:%S] ==== Log File Opened ====\n", curTime);
+    
+    if (pos != 0)
+    {
+        ::fwrite(message, sizeof(byte), pos, fp);
+        ::fflush(fp);
+    }
 }
 
 void LogWriterMaster::close(int sourceId)
@@ -308,7 +287,7 @@ void LogWriterMaster::close(FILE* fp)
     time_t rawTime      = time(nullptr);
     struct tm* curTime  = localtime(&rawTime);
     
-    size_t pos = strftime(message, sizeof(message), "[%c] ==== Log File Closed ====\n", curTime);
+    size_t pos = strftime(message, sizeof(message), "[%Y-%m-%d : %H:%M:%S] ==== Log File Closed ====\n", curTime);
     
     if (pos != 0)
         ::fwrite(message, sizeof(byte), pos, fp);

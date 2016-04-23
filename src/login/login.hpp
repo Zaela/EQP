@@ -157,7 +157,7 @@ public:
     Login();
     ~Login();
 
-    void init(const char* ipcPath);
+    void init(const char* ipcPath, const char* serverName);
     void mainLoop();
 };
 

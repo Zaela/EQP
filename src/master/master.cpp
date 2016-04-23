@@ -70,6 +70,10 @@ void Master::mainLoop()
         m_timerPool.executeTimerCallbacks();
         m_databaseThread.executeQueryCallbacks();
         
+        // IPC output queues for pushes outside the IPC thread, or for overflows
+        m_ipcLogin.processOutQueue();
+        m_ipcCharSelect.processOutQueue();
+        
         if (m_mainLoopEnd)
             return;
         
@@ -89,12 +93,43 @@ void Master::ipcThreadProc(Master* master)
 
 void Master::ipcThreadLoop()
 {
+    m_logWriter.log(Log::Info, "IPC Thread started");
+    
     for (;;)
     {
         m_ipcSemaphore.wait();
         
+        processIpcInput(m_ipcCharSelect);
+        processIpcInput(m_ipcLogin);
+        
         if (m_ipcThreadEnd)
             return;
+    }
+}
+
+void Master::processIpcInput(IpcMaster& ipc)
+{
+    SharedRingBuffer::Packet packet;
+    
+    for (;;)
+    {
+        if (!ipc.pop(packet))
+            return;
+        
+        processIpcInput(packet);
+    }
+}
+
+void Master::processIpcInput(SharedRingBuffer::Packet& packet)
+{
+    switch (packet.opcode())
+    {
+    case ServerOp::LogMessage:
+        m_logWriter.log(packet);
+        break;
+    
+    default:
+        break;
     }
 }
 
@@ -124,7 +159,7 @@ pid_t Master::spawnProcess(const char* path, const char* arg1, const char* arg2)
         throw Exception("[Master::spawnProcess] fork() failed");
     }
     
-    m_logWriter.log(Log::Info, "SpawnedProcess \"%s\" with pid %i", path, pid);
+    m_logWriter.log(Log::Info, "Spawned process \"%s\" with pid %i", path, pid);
     
     return pid;
 }

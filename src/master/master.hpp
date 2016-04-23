@@ -10,6 +10,7 @@
 #include "master_semaphore_creator.hpp"
 #include "exception.hpp"
 #include "source_id.hpp"
+#include "server_op.hpp"
 #include "atomic_mutex.hpp"
 #include "clock.hpp"
 
@@ -49,8 +50,8 @@ private:
     // IPC
     MasterSemaphoreCreator  m_ipcSemaphore;
     
-    IpcMaster m_ipcLogin;
     IpcMaster m_ipcCharSelect;
+    IpcMaster m_ipcLogin;
 
     std::atomic_bool    m_ipcThreadEnd;
     AtomicMutex         m_ipcThreadLifetimeMutex;
@@ -61,6 +62,10 @@ private:
 
     void ipcThreadLoop();
     static void ipcThreadProc(Master* master);
+    void processIpcInput(IpcMaster& ipc);
+    void processIpcInput(SharedRingBuffer::Packet& packet);
+
+    pid_t spawnProcess(const char* path, const char* arg1 = nullptr, const char* arg2 = nullptr);
 
 public:
     Master();
@@ -70,8 +75,6 @@ public:
     void mainLoop();
 
     LogWriterMaster& logWriter() { return m_logWriter; }
-    
-    pid_t spawnProcess(const char* path, const char* arg1 = nullptr, const char* arg2 = nullptr);
 };
 
 #endif//_EQP_MASTER_HPP_
