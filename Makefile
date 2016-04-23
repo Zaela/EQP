@@ -52,8 +52,8 @@ HCOMMON_ALL+= $(HCOMMON_DB)
 ##############################################################################
 DIRCOMMON_LOG= $(DIRCOMMON)log/
 BCOMMON_LOG= $(BCOMMON)log/
-_OCOMMON_LOG= log_share_mem.o   log_writer_common.o
-_HCOMMON_LOG= log_share_mem.hpp log_writer_common.hpp
+_OCOMMON_LOG= log_writer_common.o
+_HCOMMON_LOG= log_writer_common.hpp
 OCOMMON_LOG= $(patsubst %,$(BCOMMON_LOG)%,$(_OCOMMON_LOG))
 HCOMMON_LOG= $(patsubst %,$(DIRCOMMON_LOG)%,$(_HCOMMON_LOG))
 
@@ -120,27 +120,14 @@ OCOMMON_ALL+= $(OCOMMON_TIME)
 HCOMMON_ALL+= $(HCOMMON_TIME)
 
 ##############################################################################
-# Log
-##############################################################################
-DIRLOG= src/log/
-BLOG= build/$(BUILDTYPE)/log/
-_OLOG= log_main.o log_server.o
-_HLOG= log_server.hpp
-OLOG= $(patsubst %,$(BLOG)%,$(_OLOG))
-HLOG= $(patsubst %,$(DIRLOG)%,$(_HLOG))
-
-INCLUDELOG= -I$(DIRLOG)
-BINLOG= $(DIRBIN)eqp-log
-
-##############################################################################
 # Master
 ##############################################################################
 DIRMASTER= src/master/
 BMASTER= build/$(BUILDTYPE)/master/
 _OMASTER= master_main.o \
- master.o   log_writer_master.o   log_client.o   ipc_master.o
+ master.o   log_writer_master.o   ipc_master.o
 _HMASTER= \
- master.hpp log_writer_master.hpp log_client.hpp ipc_master.hpp
+ master.hpp log_writer_master.hpp ipc_master.hpp
 OMASTER= $(patsubst %,$(BMASTER)%,$(_OMASTER))
 HMASTER= $(patsubst %,$(DIRMASTER)%,$(_HMASTER))
 
@@ -225,10 +212,6 @@ amalg-char-select:
 	$(E) "Building $(BINCHARSELECT)"
 	$(Q)$(CXX) -o $(BINCHARSELECT) amalg/amalg_char_select.cpp $(LSTATIC) $(LDYNAMIC) $(LFLAGS) $(COPT) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDECHARSELECT)
 
-$(BINLOG): $(OLOG) $(OCOMMON) $(OCOMMON_LOG) $(OCOMMON_SHAREMEM) $(OCOMMON_SYNC) $(OCOMMON_TIME)
-	$(E) "Linking $@"
-	$(Q)$(CXX) -o $@ $^ $(LSTATIC) $(LDYNAMIC) $(LFLAGS)
-
 $(BINMASTER): $(OMASTER) $(OCOMMON_ALL)
 	$(E) "Linking $@"
 	$(Q)$(CXX) -o $@ $^ $(LSTATIC) $(LDYNAMIC) $(LFLAGS)
@@ -244,10 +227,6 @@ $(BINCHARSELECT): $(OCHARSELECT) $(OCOMMON_ALL)
 $(BCOMMON)%.o: $(DIRCOMMON)%.cpp $(HCOMMON_ALL)
 	$(E) "\033[0;32mCXX       $@\033[0m"
 	$(Q)$(CXX) -c -o $@ $< $(COPT) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE)
-
-$(BLOG)%.o: $(DIRLOG)%.cpp $(HLOG)
-	$(E) "\033[0;32mCXX       $@\033[0m"
-	$(Q)$(CXX) -c -o $@ $< $(COPT) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDELOG)
 
 $(BMASTER)%.o: $(DIRMASTER)%.cpp $(HMASTER)
 	$(E) "\033[0;32mCXX       $@\033[0m"
@@ -273,11 +252,6 @@ clean-common:
 	$(Q)$(RM) $(BCOMMON_TIME)*.o
 	$(E) "Cleaned common"
 
-clean-log:
-	$(Q)$(RM) $(BLOG)*.o
-	$(Q)$(RM) $(BINLOG)
-	$(E) "Cleaned log"
-
 clean-master:
 	$(Q)$(RM) $(BMASTER)*.o
 	$(Q)$(RM) $(BINMASTER)
@@ -293,5 +267,5 @@ clean-char-select:
 	$(Q)$(RM) $(BINCHARSELECT)
 	$(E) "Cleaned char-select"
 
-clean: clean-common clean-log clean-master clean-login clean-char-select
+clean: clean-common clean-master clean-login clean-char-select
 

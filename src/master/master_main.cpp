@@ -1,12 +1,9 @@
 
 #include "define.hpp"
 #include "terminal.hpp"
-#include "log_client.hpp"
 #include "master.hpp"
 #include "clock.hpp"
 #include <exception>
-#include <thread>
-#include <chrono>
 
 int main(int argc, const char** argv)
 {
@@ -22,6 +19,8 @@ int main(int argc, const char** argv)
     }
     catch (std::exception& e)
     {
+        std::lock_guard<AtomicMutex> lock(master.logWriter().printfMutex());
+        
         printf(
             TERM_RED "[ERROR]\n"
             "================================================================================\n" TERM_DEFAULT

@@ -79,6 +79,8 @@ public:
 
     void init();
 
+    AtomicMutex& printfMutex() { return m_printfMutex; }
+
     void openLogFileFor(int sourceId);
     void closeLogFileFor(int sourceId);
 

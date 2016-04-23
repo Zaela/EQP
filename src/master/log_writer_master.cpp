@@ -117,7 +117,7 @@ void LogWriterMaster::log(Log::Type type, const char* fmt, va_list args)
                 break;
             }
             
-            printf("[%s\n" TERM_DEFAULT, message + 14);
+            printf("[%s\n" TERM_DEFAULT, message + 14); // 14 to skip the year-month-day part
         }
     }
 }
