@@ -9,19 +9,42 @@
 #include "ipc_master.hpp"
 #include "master_semaphore_creator.hpp"
 #include "exception.hpp"
+#include "source_id.hpp"
+#include "atomic_mutex.hpp"
+#include "clock.hpp"
 
 #ifdef EQP_LINUX
 # include <sys/types.h>
 # include <unistd.h>
 #endif
 
+#ifdef EQP_WINDOWS
+# define EQP_CHAR_SELECT_BIN    "eqp-char-select.exe"
+# define EQP_LOGIN_BIN          "eqp-login.exe"
+#else
+# define EQP_LOGIN_BIN          "./eqp-login"
+# define EQP_CHAR_SELECT_BIN    "./eqp-char-select"
+#endif
+
+// Master is comprised of 4 threads:
+// the main thread, which just runs timers and db query callbacks and sleeps comfortably in between (50 ms);
+// the database thread;
+// the logging thread;
+// and the IPC thread, which spends most of its time blocking on the master semaphore
+//
+// Most data manipulation happens in the IPC thread, in direct response to requests;
+// for this reason query callbacks, which happen in the main thread, must synchronize
+// before manipulating any data that belongs to Master.
+
 class Master
 {
 private:
-    TimerPool       m_timerPool;
-    DatabaseThread  m_databaseThread;
-    Database        m_database;
-    LogWriterMaster m_logWriter;
+    TimerPool           m_timerPool;
+    DatabaseThread      m_databaseThread;
+    Database            m_database;
+    LogWriterMaster     m_logWriter;
+
+    std::atomic_bool    m_mainLoopEnd;
 
     // IPC
     MasterSemaphoreCreator  m_ipcSemaphore;
@@ -29,21 +52,26 @@ private:
     IpcMaster m_ipcLogin;
     IpcMaster m_ipcCharSelect;
 
+    std::atomic_bool    m_ipcThreadEnd;
+    AtomicMutex         m_ipcThreadLifetimeMutex;
+
+private:
+    void launchCharSelect();
+    void launchLogin();
+
+    void ipcThreadLoop();
+    static void ipcThreadProc(Master* master);
+
 public:
     Master();
+    ~Master();
 
     void init();
+    void mainLoop();
+
+    LogWriterMaster& logWriter() { return m_logWriter; }
     
-    // Object accessors
-    Database& database() { return m_database; }
-    
-    // Convenience methods
-    void log(Log::Type type, const char* fmt, ...);
-    
-    // Other
-    void executeBackgroundThreadCallbacks();
-    
-    pid_t spawnProcess(const char* path, const char* arg = nullptr);
+    pid_t spawnProcess(const char* path, const char* arg1 = nullptr, const char* arg2 = nullptr);
 };
 
 #endif//_EQP_MASTER_HPP_

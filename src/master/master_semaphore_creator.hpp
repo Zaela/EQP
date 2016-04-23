@@ -22,6 +22,7 @@ public:
     }
     
     void wait() { m_semaphore->wait(); }
+    void trigger() { m_semaphore->trigger(); }
 };
 
 #endif//_EQP_MASTER_SEMAPHORE_CREATOR_HPP_

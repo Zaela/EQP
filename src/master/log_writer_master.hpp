@@ -10,6 +10,7 @@
 #include "server_op.hpp"
 #include "source_id.hpp"
 #include "exception.hpp"
+#include "terminal.hpp"
 #include <vector>
 #include <string>
 #include <ctime>
@@ -51,13 +52,15 @@ private:
 private:
     std::vector<LogFile> m_logFiles;
 
-    bool                m_threadEnd;
+    std::atomic_bool    m_threadEnd;
     Semaphore           m_threadSemaphore;
     AtomicMutex         m_inQueueMutex;
     std::vector<Op>     m_inQueue;
 
     AtomicMutex         m_threadLifetimeMutex;
     std::vector<Op>     m_threadProcessQueue;
+
+    AtomicMutex         m_printfMutex;
 
 private:
     void threadLoop();

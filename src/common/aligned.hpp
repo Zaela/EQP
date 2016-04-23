@@ -65,9 +65,9 @@ public:
     void int64(int64_t value) { uint64((uint64_t)value); }
     void uint64(uint64_t value);
     
-    void string(const char* str) { string(str, strlen(str)); }
     void string(const char* str, uint32_t length) { buffer((::byte*)str, length); }
     void string(const std::string& str) { string(str.c_str(), str.length()); }
+    void stringNullTerminated(const std::string& str) { string(str.c_str(), str.length() + 1); }
     
     void buffer(::byte* data, uint32_t length);
 };

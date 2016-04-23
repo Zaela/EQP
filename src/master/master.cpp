@@ -3,10 +3,23 @@
 
 Master::Master()
 : m_databaseThread(m_logWriter),
-  m_database(m_databaseThread, m_logWriter)
+  m_database(m_databaseThread, m_logWriter),
+  m_mainLoopEnd(false),
+  m_ipcThreadEnd(false)
 {
     
 }
+
+Master::~Master()
+{
+    m_ipcThreadEnd = true;
+    m_ipcSemaphore.trigger();
+    std::lock_guard<AtomicMutex> lock(m_ipcThreadLifetimeMutex);
+}
+
+/*================================================================================*\
+** Initialization
+\*================================================================================*/
 
 void Master::init()
 {
@@ -23,42 +36,85 @@ void Master::init()
     // IPC
     m_ipcSemaphore.init();
     
-    m_ipcLogin.init(EQP_IPC_LOGIN);
+    std::thread ipcThread(ipcThreadProc, this);
+    ipcThread.detach();
+    
+    launchCharSelect();
+    launchLogin();
+}
+
+void Master::launchCharSelect()
+{
     m_ipcCharSelect.init(EQP_IPC_CHAR_SELECT);
+    //m_logWriter.openLogFileFor(SourceId::CharSelect);
+    
+    //spawnProcess(EQP_CHAR_SELECT_BIN, EQP_IPC_CHAR_SELECT);
+}
+
+void Master::launchLogin()
+{
+    m_ipcLogin.init(EQP_IPC_LOGIN);
+    m_logWriter.openLogFileFor(SourceId::Login);
+    
+    spawnProcess(EQP_LOGIN_BIN, EQP_IPC_LOGIN, "EQP Test"); //fixme: get server name from config
 }
 
 /*================================================================================*\
-** Convenience methods
+** Main thread
 \*================================================================================*/
 
-void Master::log(Log::Type type, const char* fmt, ...)
+void Master::mainLoop()
 {
-    va_list args;
-    va_start(args, fmt);
-    m_logWriter.log(type, fmt, args);
-    va_end(args);
+    for (;;)
+    {
+        m_timerPool.executeTimerCallbacks();
+        m_databaseThread.executeQueryCallbacks();
+        
+        if (m_mainLoopEnd)
+            return;
+        
+        Clock::sleepMilliseconds(50);
+    }
+}
+
+/*================================================================================*\
+** IPC thread
+\*================================================================================*/
+
+void Master::ipcThreadProc(Master* master)
+{
+    std::lock_guard<AtomicMutex> lock(master->m_ipcThreadLifetimeMutex);
+    master->ipcThreadLoop();
+}
+
+void Master::ipcThreadLoop()
+{
+    for (;;)
+    {
+        m_ipcSemaphore.wait();
+        
+        if (m_ipcThreadEnd)
+            return;
+    }
 }
 
 /*================================================================================*\
 ** Other
 \*================================================================================*/
 
-void Master::executeBackgroundThreadCallbacks()
+pid_t Master::spawnProcess(const char* path, const char* arg1, const char* arg2)
 {
-    m_timerPool.executeTimerCallbacks();
-    m_databaseThread.executeQueryCallbacks();
-}
-
-pid_t Master::spawnProcess(const char* path, const char* arg)
-{
+    m_logWriter.log(Log::Info, "Spawning process \"%s\" with args \"%s\", \"%s\"", path, arg1 ? arg1 : "(null)", arg2 ? arg2 : "(null)");
+    
     pid_t pid = fork();
     
     if (pid == 0)
     {
-        const char* argv[] = {path, arg, nullptr};
+        const char* argv[] = {path, arg1, arg2, nullptr};
         
         if (execv(path, (char**)argv))
         {
+            // This will be caught by the main() of the forked Master child process.. yeah
             throw Exception("[Master::spawnProcess] child process execv() failed attempting to execute '%s', aborting", path);
         }
     }
@@ -67,6 +123,8 @@ pid_t Master::spawnProcess(const char* path, const char* arg)
         // Fork failed
         throw Exception("[Master::spawnProcess] fork() failed");
     }
+    
+    m_logWriter.log(Log::Info, "SpawnedProcess \"%s\" with pid %i", path, pid);
     
     return pid;
 }

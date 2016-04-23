@@ -48,6 +48,8 @@ private:
         uint16_t recvAck;
         uint16_t sendAck;
         uint16_t progress;
+        uint16_t playSequence;
+        uint16_t playAck;
         uint64_t lastActivityTimestamp;
     };
     
@@ -149,6 +151,7 @@ private:
     void processLoginRequest(Client* client, uint16_t seq);
     void processCredentials(byte* data, int len, Client* client, uint16_t seq);
     void processServerListRequest(Client* client, uint16_t seq);
+    void processPlayRequest(byte* data, int len, Client* client, uint16_t seq);
 
 public:
     Login();

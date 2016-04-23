@@ -52,7 +52,11 @@ public:
             int         m_state;
             int64_t     m_lastInsertId;
         };
-        void*           m_userdata;
+        union
+        {
+            void*       m_userdata;
+            int64_t     m_userInt;
+        };
         Callback        m_callback;
         uint32_t        m_queryNum;
         uint64_t        m_timestamp;
@@ -74,6 +78,8 @@ public:
         void callback() { if (m_callback) m_callback(*this); }
         bool execute();
         
+        bool hasCallback() { return m_callback ? true : false; }
+        
         int getState() const { return m_state; }
 
     public:
@@ -86,8 +92,10 @@ public:
         void executeSynchronus();
     
         void* userdata() const { return m_userdata; }
+        int64_t userInt() const { return m_userInt; }
         
         void setUserdata(void* ud) { m_userdata = ud; }
+        void setuserInt(int64_t val) { m_userInt = val; }
         void setCallback(Callback callback) { m_callback = callback; }
     
         bool select();
@@ -152,7 +160,7 @@ private:
     AtomicMutex         m_outQueueMutex;
     std::vector<Query>  m_outQueue;
 
-    bool                m_threadEnd;
+    std::atomic_bool    m_threadEnd;
     Semaphore           m_threadSemaphore;
     AtomicMutex         m_threadLifetimeMutex;
     std::vector<Query>  m_threadProcessQueue;

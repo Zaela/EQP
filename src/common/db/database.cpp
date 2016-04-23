@@ -218,12 +218,21 @@ void DatabaseThread::threadLoop()
                 {
                     if (query.execute())
                     {
-                        if (query.getState() == SQLITE_DONE)
-                            query.setLastInsertId();
+                        if (query.hasCallback())
+                        {
+                            if (query.getState() == SQLITE_DONE)
+                                query.setLastInsertId();
+                            
+                            m_outQueueMutex.lock();
+                            m_outQueue.emplace_back(std::move(query));
+                            m_outQueueMutex.unlock();
+                        }
+                        else
+                        {
+                            // Swap and pop alone won't destruct these properly
+                            query.~Query();
+                        }
                         
-                        m_outQueueMutex.lock();
-                        m_outQueue.emplace_back(std::move(query));
-                        m_outQueueMutex.unlock();
                         swapAndPop(i);
                         continue;
                     }
@@ -232,7 +241,7 @@ void DatabaseThread::threadLoop()
                 }
                 catch (std::exception& e)
                 {
-                    m_logWriter.log(Log::Error, "[ERROR] [Database Thread] %s", e.what());
+                    m_logWriter.log(Log::Error, "[DatabaseThread] %s", e.what());
                     swapAndPop(i);
                 }
             }
@@ -284,7 +293,7 @@ Database::Query::Query()
 : m_stmt(nullptr),
   m_database(nullptr),
   m_state(State::NotYetRun),
-  m_userdata(nullptr),
+  m_userInt(0),
   m_queryNum(0),
   m_timestamp(0)
 {
@@ -295,7 +304,7 @@ Database::Query::Query(Database::Query&& o)
 : m_stmt(nullptr),
   m_database(nullptr),
   m_state(State::NotYetRun),
-  m_userdata(nullptr),
+  m_userInt(0),
   m_queryNum(0),
   m_timestamp(0)
 {
@@ -312,7 +321,7 @@ Database::Query& Database::Query::operator=(Database::Query&& o)
 {
     m_stmt          = o.m_stmt;
     m_database      = o.m_database;
-    m_userdata      = o.m_userdata;
+    m_userInt       = o.m_userInt;
     m_lastInsertId  = o.m_lastInsertId;
     m_callback      = o.m_callback;
     m_queryNum      = o.m_queryNum;

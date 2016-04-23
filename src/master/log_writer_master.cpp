@@ -56,7 +56,7 @@ void LogWriterMaster::log(Log::Type type, const char* fmt, va_list args)
     time_t rawTime      = time(nullptr);
     struct tm* curTime  = localtime(&rawTime);
     
-    size_t pos = strftime(message, sizeof(message), "[%c]", curTime);
+    size_t pos = strftime(message, sizeof(message), "[%Y-%m-%d : %H:%M:%S]", curTime);
     
     if (pos == 0)
         throw Exception("[LogWriterMaster::log] strftime() failed");
@@ -94,6 +94,30 @@ void LogWriterMaster::log(Log::Type type, const char* fmt, va_list args)
             
             SharedRingBuffer::Packet packet(ServerOp::None, SourceId::Master, pos, (byte*)message);
             log(packet);
+            
+            if (type == Log::Fatal || type == Log::None)
+                return;
+            
+            std::lock_guard<AtomicMutex> lock(m_printfMutex);
+            switch (type)
+            {
+            case Log::Error:
+                printf(TERM_RED);
+                break;
+            
+            case Log::Info:
+                printf(TERM_YELLOW);
+                break;
+            
+            case Log::SQL:
+                printf(TERM_DARK_GREEN);
+                break;
+            
+            default:
+                break;
+            }
+            
+            printf("[%s\n" TERM_DEFAULT, message + 14);
         }
     }
 }
@@ -203,9 +227,15 @@ void LogWriterMaster::determineLogFileNameAndOpen(int sourceId)
     case SourceId::Master:
         ::snprintf(filename, 256, "log/master.log");
         break;
+    
     case SourceId::CharSelect:
         ::snprintf(filename, 256, "log/char_select.log");
         break;
+    
+    case SourceId::Login:
+        ::snprintf(filename, 256, "log/login.log");
+        break;
+        
     default:
         if (sourceId >= SourceId::ZoneClusterOffset)
             ::snprintf(filename, 256, "log/zone_cluster%i.log", sourceId - SourceId::ZoneClusterOffset);

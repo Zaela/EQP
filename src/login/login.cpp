@@ -174,11 +174,13 @@ void Login::processPacket(int len, IpAddress& addr)
     {
         Client cli;
         
-        cli.ipAddress   = ip;
-        cli.port        = port;
-        cli.recvAck     = 0;
-        cli.sendAck     = 0;
-        cli.progress    = Progress::None;
+        cli.ipAddress       = ip;
+        cli.port            = port;
+        cli.recvAck         = 0;
+        cli.sendAck         = 0;
+        cli.progress        = Progress::None;
+        cli.playSequence    = 0;
+        cli.playAck         = 0;
         
         m_clients.push_back(cli);
         client = &m_clients.back();
@@ -259,6 +261,10 @@ void Login::processPacket(byte* data, int len, Client* client)
     
     case LoginOp::ServerListRequest:
         processServerListRequest(client, seq);
+        break;
+    
+    case LoginOp::PlayRequest:
+        processPlayRequest(data, len, client, seq);
         break;
     
     default:
@@ -662,7 +668,30 @@ void Login::processServerListRequest(Client* client, uint16_t seq)
     // player count
     w.uint32(m_serverPlayerCount);
     
-    send(client, list, size + 6); // Count the 6 byte packet header here
+    send(client, list, size);
     
     client->progress = Progress::ReceivedServerList;
+}
+
+void Login::processPlayRequest(byte* data, int len, Client* client, uint16_t seq)
+{
+#pragma pack(1)
+    struct PlayRequest
+    {
+        uint16_t sequence;
+        uint32_t unknown[2];
+        uint32_t runtimeId;
+    };
+#pragma pack()
+    
+    if ((uint32_t)len < sizeof(PlayRequest) || client->progress < Progress::LoggedIn)
+        return;
+    
+    AlignedReader r(data, len);
+    
+    // sequence
+    client->playSequence    = r.uint16();
+    client->playAck         = seq;
+    
+    //ipc happens here...
 }
