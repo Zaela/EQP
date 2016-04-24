@@ -16,6 +16,7 @@ enum class ServerOp : uint32_t
     // Login
     LoginRequest,
     LoginResponse,
+    LoginClientAuth,
     COUNT
 };
 

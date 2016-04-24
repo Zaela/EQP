@@ -26,6 +26,17 @@ namespace LoginStruct
         uint32_t    fromId;
         uint32_t    toId;
     };
+    
+    struct ClientAuth
+    {
+        uint32_t    accountId;
+        char        name[30];
+        char        sessionKey[30]; // Only actually 10 characters long
+        uint8_t     loginAdminLevel;
+        int16_t     worldAdminLevel;
+        uint32_t    ipAddress;
+        uint8_t     isFromLocalNetwork;
+    };
 #pragma pack()
     
 }; //namespace Packet

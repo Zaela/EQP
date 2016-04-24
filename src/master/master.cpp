@@ -6,7 +6,8 @@ extern std::atomic_bool g_shutdown;
 Master::Master()
 : m_databaseThread(m_logWriter),
   m_database(m_databaseThread, m_logWriter),
-  m_mainLoopEnd(false),
+  m_ipcCharSelect(m_ipcSemaphore),
+  m_ipcLogin(m_ipcSemaphore),
   m_ipcThreadEnd(false)
 {
     
@@ -72,10 +73,6 @@ void Master::mainLoop()
         m_timerPool.executeTimerCallbacks();
         m_databaseThread.executeQueryCallbacks();
         
-        // IPC output queues for pushes outside the IPC thread, or for overflows
-        m_ipcLogin.processOutQueue();
-        m_ipcCharSelect.processOutQueue();
-        
         if (g_shutdown)
             return;
         
@@ -103,6 +100,10 @@ void Master::ipcThreadLoop()
         
         processIpcInput(m_ipcCharSelect);
         processIpcInput(m_ipcLogin);
+        
+        // IPC output queues for pushes outside the IPC thread, or for overflows
+        m_ipcCharSelect.processOutQueue();
+        m_ipcLogin.processOutQueue();
         
         if (m_ipcThreadEnd)
             return;
@@ -137,6 +138,11 @@ void Master::processIpcInput(IpcPacket& packet)
     // Login
     case ServerOp::LoginRequest:
         validateLoginRequest(packet);
+        break;
+    
+    case ServerOp::LoginClientAuth:
+        // Forward to CharSelect
+        //m_ipcCharSelect.forward(packet);
         break;
     
     default:

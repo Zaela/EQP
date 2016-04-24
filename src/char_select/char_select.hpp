@@ -9,6 +9,10 @@
 #include "ipc_buffer.hpp"
 #include "source_id.hpp"
 
+// CharSelect is comprised of 3 threads:
+// the main thread, which runs callbacks, handles IPC input, and handles UDP output (?)
+// the database thread;
+
 class CharSelect
 {
 private:
@@ -21,7 +25,8 @@ private:
 public:
     CharSelect();
 
-    void init();
+    void init(const char* ipcPath);
+    void mainLoop();
 };
 
 #endif//_EQP_CHAR_SELECT_HPP_

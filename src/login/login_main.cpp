@@ -18,7 +18,7 @@ int main(int argc, const char** argv)
     signal(SIGINT, SIG_IGN);
 #endif
     
-    // Scope for Login object
+    // Scope for the Login object
     {
         Login login;
         
@@ -37,7 +37,7 @@ int main(int argc, const char** argv)
         }
         catch (std::exception& e)
         {
-            printf("exception: %s\n", e.what());
+            printf("LOGIN exception: %s\n", e.what());
         }
     }
     

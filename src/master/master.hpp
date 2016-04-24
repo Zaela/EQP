@@ -47,8 +47,6 @@ private:
     Database            m_database;
     LogWriterMaster     m_logWriter;
 
-    std::atomic_bool    m_mainLoopEnd;
-
     // IPC
     MasterSemaphoreCreator  m_ipcSemaphore;
     
@@ -78,7 +76,6 @@ public:
 
     void init();
     void mainLoop();
-    void shutdown() { m_mainLoopEnd = true; }
     void shutDownChildProcesses();
 
     LogWriterMaster& logWriter() { return m_logWriter; }

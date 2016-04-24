@@ -63,6 +63,8 @@ public:
         uint32_t length() const { return m_length; }
         byte* data() { return m_data; }
         
+        void setSourceId(int id) { m_sourceId = id; }
+        
         byte* takeOwnershipOfData();
         void grantOwnershipOfData(ServerOp opcode, int sourceId, uint32_t len, byte* data);
     };

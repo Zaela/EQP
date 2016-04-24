@@ -9,12 +9,21 @@ CharSelect::CharSelect()
     
 }
 
-void CharSelect::init()
+void CharSelect::init(const char* ipcPath)
 {
+    // Shared Memory IPC area
+    // Must be done before anything that tries to log, since log messages go through IPC
+    m_ipc.init(ipcPath);
+    
     // Timer pool and timers
     m_timerPool.init();
     
     // Database thread and main database file
     m_databaseThread.init();
     m_database.init(EQP_SQLITE_MAIN_DATABASE_PATH, EQP_SQLITE_MAIN_SCHEMA_PATH);
+}
+
+void CharSelect::mainLoop()
+{
+    
 }

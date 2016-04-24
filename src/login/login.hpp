@@ -136,6 +136,7 @@ private:
     void processServerListRequest(Client* client, uint16_t seq);
     void processPlayRequest(byte* data, int len, Client* client, uint16_t seq);
     void processPlayResponse(IpcPacket& packet);
+    void sendClientAuthToMaster(Client* client);
 
 public:
     Login();

@@ -753,6 +753,9 @@ void Login::processPlayResponse(IpcPacket& packet)
     if (!client || client->progress < Progress::LoggedIn)
         return;
     
+    if (r->response == 1)
+        sendClientAuthToMaster(client);
+    
     PlayResponse resp(client->playAck, sizeof(PlayResponse), client->sendAck++, LoginOp::PlayResponse);
     AlignedWriter w = resp.writer();
     
@@ -794,4 +797,36 @@ void Login::processPlayResponse(IpcPacket& packet)
     w.uint32(r->serverId);
     
     send(client, &resp, sizeof(PlayResponse));
+}
+
+void Login::sendClientAuthToMaster(Client* client)
+{
+    LoginStruct::ClientAuth auth;
+    AlignedWriter w(&auth, sizeof(LoginStruct::ClientAuth));
+    
+    char buf[30];
+    
+    // accountId
+    w.uint32((uint32_t)client->accountId);
+    
+    // name
+    memset(buf, 0, sizeof(buf));
+    ::snprintf(buf, sizeof(buf), "EQP Locally Created");
+    w.string(buf, sizeof(buf));
+    
+    // sessionKey
+    memset(buf, 0, sizeof(buf));
+    ::snprintf(buf, sizeof(buf), "0000000000");
+    w.string(buf, sizeof(buf));
+    
+    // loginAdminLevel
+    w.uint8(0);
+    // worldAdminLevel
+    w.int16(0);
+    // ipAddress
+    w.uint32(client->ipAddress);
+    // isFromLocalNetwork
+    w.boolean(true);
+    
+    m_ipc.push(ServerOp::LoginClientAuth, SourceId::Login, sizeof(LoginStruct::ClientAuth), &auth);
 }
