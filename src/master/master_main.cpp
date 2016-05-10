@@ -14,13 +14,11 @@ int main(int argc, const char** argv)
     
     g_shutdown = false;
     
-#ifdef EQP_LINUX
     signal(SIGINT, [](int)
     {
         printf("\n--Interrupted!\n");
         g_shutdown = true;
     });
-#endif
     
     // Scope for the Master object
     {

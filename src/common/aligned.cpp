@@ -61,6 +61,17 @@ uint64_t AlignedReader::uint64()
     return ret;
 }
 
+void AlignedReader::buffer(void* ptr, uint32_t len)
+{
+    ::byte* dst = (::byte*)ptr;
+    uint32_t c  = advance(len);
+    
+    for (uint32_t i = 0; i < len; i++)
+    {
+        dst[i] = m_buffer[c + i];
+    }
+}
+
 /*================================================================================*\
 ** AlignedWriter
 \*================================================================================*/
@@ -117,4 +128,11 @@ void AlignedWriter::buffer(::byte* data, uint32_t len)
     {
         m_buffer[c + i] = data[i];
     }
+}
+
+void AlignedWriter::random(uint32_t bytes)
+{
+    uint32_t c = advance(bytes);
+    
+    sqlite3_randomness((int)bytes, m_buffer + c);
 }

@@ -13,11 +13,12 @@
 #include "aligned.hpp"
 #include "source_id.hpp"
 #include "server_op.hpp"
+#include "packet_structs_protocol.hpp"
 #include "packet_structs_login.hpp"
 #include <vector>
 #include <string>
 
-#define EQP_LOGIN_PORT 5999
+#define EQP_LOGIN_PORT 5998
 #define EQP_LOGIN_TIMEOUT_MILLISECONDS 60000
 
 class Login

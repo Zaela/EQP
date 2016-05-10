@@ -36,6 +36,8 @@ CREATE TABLE inventory (
     character_id    INT,
     slot_id         INT,
     item_id         INT,
+    stack_amount    INT DEFAULT 1,
+    charges         INT DEFAULT 0,
     
     PRIMARY KEY(character_id, slot_id)
 );

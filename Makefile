@@ -66,8 +66,11 @@ HCOMMON_ALL+= $(HCOMMON_LOG)
 ##############################################################################
 DIRCOMMON_NET= $(DIRCOMMON)net/
 BCOMMON_NET= $(BCOMMON)net/
-_OCOMMON_NET= 
-_HCOMMON_NET= eq_packet_protocol.hpp packet_structs_login.hpp
+_OCOMMON_NET= \
+ udp_socket.o   protocol_handler.o
+_HCOMMON_NET= eq_packet_protocol.hpp packet_structs_protocol.hpp \
+ packet_structs_login.hpp \
+ udp_socket.hpp protocol_handler.hpp
 OCOMMON_NET= $(patsubst %,$(BCOMMON_NET)%,$(_OCOMMON_NET))
 HCOMMON_NET= $(patsubst %,$(DIRCOMMON_NET)%,$(_HCOMMON_NET))
 
@@ -155,9 +158,9 @@ BINLOGIN= $(DIRBIN)eqp-login
 DIRCHARSELECT= src/char_select/
 BCHARSELECT= build/$(BUILDTYPE)/char_select/
 _OCHARSELECT= char_select_main.o \
- char_select.o
+ char_select.o   char_select_client.o   char_select_socket.o
 _HCHARSELECT= \
- char_select.hpp
+ char_select.hpp char_select_client.hpp char_select_socket.hpp
 OCHARSELECT= $(patsubst %,$(BCHARSELECT)%,$(_OCHARSELECT))
 HCHARSELECT= $(patsubst %,$(DIRCHARSELECT)%,$(_HCHARSELECT))
 

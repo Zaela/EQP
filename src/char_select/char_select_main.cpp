@@ -1,6 +1,5 @@
 
 #include "char_select.hpp"
-#include "clock.hpp"
 #include <exception>
 
 int main(int argc, const char** argv)

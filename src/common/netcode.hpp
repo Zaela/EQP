@@ -19,12 +19,21 @@
 # include <arpa/inet.h>
 # include <netinet/tcp.h>
 # include <net/if.h>
+# include <endian.h>
 #endif
 
 #define toNetworkShort htons
 #define toNetworkLong htonl
 #define toHostShort ntohs
 #define toHostLong ntohl
+
+#ifdef EQP_WINDOWS
+# define toNetworkUint64 htonll
+# define toHostUint64 ntohll
+#else
+# define toNetworkUint64 htobe64
+# define toHostUint64 be64toh
+#endif
 
 #ifndef EQP_WINDOWS
 # define closesocket close

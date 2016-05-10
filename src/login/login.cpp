@@ -322,33 +322,11 @@ void Login::swapAndPop(Client* client)
 
 void Login::sendSessionResponse(Client* client)
 {
-#pragma pack(1)
-    struct SessionRequest
-    {
-        uint16_t    opcode;
-        uint32_t    unknown;
-        uint32_t    session;
-        uint32_t    maxLength;
-    };
+    AlignedReader req(m_sockBuffer, sizeof(ProtocolStruct::SessionRequest));
+    req.advance(offsetof(ProtocolStruct::SessionRequest, session));
     
-    struct SessionResponse
-    {
-        uint16_t    opcode;
-        uint32_t    session;
-        uint32_t    key;
-        uint8_t     validation;
-        uint8_t     format;
-        uint8_t     unknownA;
-        uint32_t    maxLength;
-        uint32_t    unknownB;
-    };
-#pragma pack()
-    
-    AlignedReader req(m_sockBuffer, sizeof(SessionRequest));
-    req.advance(offsetof(SessionRequest, session));
-    
-    SessionResponse resp;
-    AlignedWriter w(&resp, sizeof(SessionResponse));
+    ProtocolStruct::SessionResponse resp;
+    AlignedWriter w(&resp, sizeof(ProtocolStruct::SessionResponse));
     
     w.zeroAll();
     
@@ -356,12 +334,12 @@ void Login::sendSessionResponse(Client* client)
     w.uint16(toNetworkShort(EQProtocol::SessionResponse));
     // session
     w.uint32(req.uint32());
-    // key, validation, format, unknownA
+    // crcKey, validation, format, unknownA
     w.advance(sizeof(uint32_t) + sizeof(uint8_t) * 3);
     // maxLength
     w.uint32(req.uint32());
     
-    send(client, &resp, sizeof(SessionResponse));
+    send(client, &resp, sizeof(ProtocolStruct::SessionResponse));
     
     client->progress = Progress::Session;
 }

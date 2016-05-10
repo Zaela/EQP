@@ -49,9 +49,9 @@ void Master::init()
 void Master::launchCharSelect()
 {
     m_ipcCharSelect.init(EQP_IPC_CHAR_SELECT);
-    //m_logWriter.openLogFileFor(SourceId::CharSelect);
+    m_logWriter.openLogFileFor(SourceId::CharSelect);
     
-    //spawnProcess(EQP_CHAR_SELECT_BIN, EQP_IPC_CHAR_SELECT);
+    spawnProcess(EQP_CHAR_SELECT_BIN, EQP_IPC_CHAR_SELECT);
 }
 
 void Master::launchLogin()
@@ -142,7 +142,7 @@ void Master::processIpcInput(IpcPacket& packet)
     
     case ServerOp::LoginClientAuth:
         // Forward to CharSelect
-        //m_ipcCharSelect.forward(packet);
+        m_ipcCharSelect.forward(packet);
         break;
     
     default:
@@ -229,7 +229,7 @@ pid_t Master::spawnProcess(const char* path, const char* arg1, const char* arg2)
 
 void Master::shutDownChildProcesses()
 {
-    //m_ipcCharSelect.push(ServerOp::Shutdown, SourceId::Master, 0, nullptr);
+    m_ipcCharSelect.push(ServerOp::Shutdown, SourceId::Master, 0, nullptr);
     m_ipcLogin.push(ServerOp::Shutdown, SourceId::Master, 0, nullptr);
     
     Clock::sleepMilliseconds(250);

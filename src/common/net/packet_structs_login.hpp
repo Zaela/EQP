@@ -39,6 +39,6 @@ namespace LoginStruct
     };
 #pragma pack()
     
-}; //namespace Packet
+}; //namespace LoginStruct
 
 #endif//_EQP_PACKET_STRUCTS_LOGIN_HPP_

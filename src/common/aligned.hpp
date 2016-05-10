@@ -5,6 +5,7 @@
 #include "define.hpp"
 #include "exception.hpp"
 #include <string>
+#include <sqlite3.h>
 
 namespace
 {
@@ -29,6 +30,12 @@ namespace
             
             return v;
         }
+        
+        inline uint32_t size() const { return m_length; }
+        inline uint32_t remaining() const { return m_length - m_cursor; }
+        inline uint32_t position() const { return m_cursor; }
+        inline ::byte* all() const { return m_buffer; }
+        inline ::byte* current() const { return m_buffer + m_cursor; }
     };
 }
 
@@ -46,6 +53,8 @@ public:
     uint32_t uint32();
     int64_t int64() { return (int64_t)uint64(); }
     uint64_t uint64();
+    
+    void buffer(void* dst, uint32_t len);
 };
 
 class AlignedWriter : public AlignedIO
@@ -71,6 +80,7 @@ public:
     void stringNullTerminated(const std::string& str) { string(str.c_str(), str.length() + 1); }
     
     void buffer(::byte* data, uint32_t length);
+    void random(uint32_t bytes);
 };
 
 #endif//_EQP_ALIGNED_HPP_
