@@ -26,6 +26,11 @@ void PacketTracker::queueInputPacket(byte* data, uint32_t len)
     m_inputPacketQueue.emplace_back(copy, len);
 }
 
+void PacketTracker::clearPacketQueues()
+{
+    m_inputPacketQueue.clear();
+}
+
 void PacketTracker::sendImmediateNoIncrement(const void* data, uint32_t len)
 {
     const byte* d = (const byte*)data;

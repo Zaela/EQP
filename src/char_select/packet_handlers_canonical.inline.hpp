@@ -1,0 +1,2 @@
+
+void handleLoginInfoCanonical(AlignedReader& r);

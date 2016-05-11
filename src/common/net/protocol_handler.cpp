@@ -231,4 +231,5 @@ void ProtocolHandler::disconnect()
     
     sendImmediate(&dis, sizeof(ProtocolStruct::SessionDisconnect));
     socket().removeHandler(this);
+    clearPacketQueues();
 }

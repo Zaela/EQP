@@ -28,7 +28,7 @@ DIRCOMMON= src/common/
 BCOMMON= build/$(BUILDTYPE)/common/
 _OCOMMON= \
  file.o   exception.o   aligned.o   crc.o
-_HCOMMON= define.hpp terminal.hpp bit.hpp \
+_HCOMMON= define.hpp terminal.hpp bit.hpp netcode.hpp \
  file.hpp exception.hpp aligned.hpp crc.hpp
 OCOMMON= $(patsubst %,$(BCOMMON)%,$(_OCOMMON))
 HCOMMON= $(patsubst %,$(DIRCOMMON)%,$(_HCOMMON))
@@ -75,7 +75,7 @@ _OCOMMON_NET= \
 _HCOMMON_NET= eq_packet_protocol.hpp packet_structs_protocol.hpp \
  packet_structs_login.hpp opcodes.hpp opcodes_canonical.hpp opcodes_titanium.hpp \
  opcodes_sof.hpp opcodes_sod.hpp opcodes_underfoot.hpp opcodes_rof.hpp \
- opcodes_rof2.hpp opcode_translation.hpp \
+ opcodes_rof2.hpp opcode_translate.hpp \
  udp_socket.hpp protocol_handler.hpp packet_tracker.hpp ack_manager.hpp
 OCOMMON_NET= $(patsubst %,$(BCOMMON_NET)%,$(_OCOMMON_NET))
 HCOMMON_NET= $(patsubst %,$(DIRCOMMON_NET)%,$(_HCOMMON_NET))
@@ -165,7 +165,8 @@ DIRCHARSELECT= src/char_select/
 BCHARSELECT= build/$(BUILDTYPE)/char_select/
 _OCHARSELECT= char_select_main.o \
  char_select.o   char_select_client.o   char_select_socket.o
-_HCHARSELECT= \
+_HCHARSELECT= packet_handlers_canonical.inline.hpp \
+ packet_handlers_titanium.inline.hpp \
  char_select.hpp char_select_client.hpp char_select_socket.hpp
 OCHARSELECT= $(patsubst %,$(BCHARSELECT)%,$(_OCHARSELECT))
 HCHARSELECT= $(patsubst %,$(DIRCHARSELECT)%,$(_HCHARSELECT))

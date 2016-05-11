@@ -85,6 +85,10 @@ public:
     uint8_t peekUint8();
     
     void buffer(void* dst, uint32_t len);
+    
+    // Returns the number of characters advanced over, not counting the null terminator
+    // If the end of the buffer is reached without finding a null terminator, returns -1
+    int advancePastNextNullTerminator();
 };
 
 class AlignedWriter : public AlignedIO

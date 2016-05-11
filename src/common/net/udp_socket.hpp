@@ -18,16 +18,20 @@ protected:
     {
         uint32_t            ipAddress;
         uint16_t            port;
-        bool                hasInputPacketsQueued;
-        bool                hasOutputPacketsQueued;
+        uint16_t            isDead : 1;
+        uint16_t            isAuthed : 1;
+        uint16_t            hasInputPacketsQueued : 1;
+        uint16_t            hasOutputPacketsQueued : 1;
         int                 byteRateWritten; //decays every 20 milliseconds
         ProtocolHandler*    handler;
         
         UdpClient(IpAddress& addr, ProtocolHandler* protoHandler)
         : ipAddress(addr.sin_addr.s_addr),
           port(addr.sin_port),
-          hasInputPacketsQueued(false),
-          hasOutputPacketsQueued(false),
+          isDead(0),
+          isAuthed(0),
+          hasInputPacketsQueued(0),
+          hasOutputPacketsQueued(0),
           byteRateWritten(0),
           handler(protoHandler)
         {
@@ -52,6 +56,8 @@ protected:
         {
             ipAddress               = o.ipAddress;
             port                    = o.port;
+            isDead                  = o.isDead;
+            isAuthed                = o.isAuthed;
             hasInputPacketsQueued   = o.hasInputPacketsQueued;
             hasOutputPacketsQueued  = o.hasOutputPacketsQueued;
             byteRateWritten         = o.byteRateWritten;
@@ -79,7 +85,6 @@ protected:
     byte    m_socketBuffer[BUFFER_SIZE];
 
     std::vector<UdpClient>  m_clients;
-    //std::vector<UdpClient>  m_clientsPendingAuth;
     std::vector<Authorized> m_authorized;
 
     LogWriterCommon&        m_logWriter;
@@ -90,6 +95,7 @@ protected:
 private:
     virtual ProtocolHandler* createProtocolHandler(IpAddress& addr) = 0;
 
+    void swapAndPop(uint32_t i, UdpClient& client);
     void sendRaw(const void* data, uint32_t len, const IpAddress& addr);
 
 public:
@@ -101,6 +107,8 @@ public:
     void receive();
     
     void addClientAuth(Authorized& auth);
+    bool isClientAuthorized(uint32_t ipAddress, uint32_t accountId, const char* sessionId);
+    void flagClientAsAuthorized(uint32_t ipAddress, uint16_t port);
     void removeHandler(ProtocolHandler* handler);
 
     int getSocketFileDescriptor() const { return m_socket; }

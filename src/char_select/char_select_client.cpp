@@ -44,9 +44,11 @@ void CharSelectClient::processInputPacket(AlignedReader& r)
 redo:
     switch (m_expansion)
     {
+#ifndef EQP_DISABLE_TITANIUM
     case Expansion::Ordinal::Titanium:
-        //handlePacketTitanium(r);
+        handlePacketTitanium(r, opcode);
         break;
+#endif
     
     case Expansion::Ordinal::Unknown:
         // We figure out what expansion we are by examining the first packet we receive with an application opcode
@@ -83,3 +85,5 @@ not_found:
     disconnect();
     return false;
 }
+
+#include "packet_handlers_canonical.inline.cpp"

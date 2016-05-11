@@ -8,17 +8,21 @@
 #include "aligned.hpp"
 #include "expansion.hpp"
 #include "opcodes.hpp"
+#include "packet_structs.hpp"
 
 class UdpSocket;
 
 class CharSelectClient : public ProtocolHandler
 {
 private:
-    Expansion::Ordinal m_expansion;
+    Expansion::Ordinal  m_expansion;
     
 private:
     void processInputPacket(AlignedReader& r);
     bool determineExpansion(uint16_t opcode);
+
+#include "packet_handlers_canonical.inline.hpp"
+#include "packet_handlers_titanium.inline.hpp"
     
 public:
     CharSelectClient(IpAddress& addr, UdpSocket& socket);

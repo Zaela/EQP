@@ -78,6 +78,23 @@ void AlignedReader::buffer(void* ptr, uint32_t len)
     }
 }
 
+int AlignedReader::advancePastNextNullTerminator()
+{
+    int len = 0;
+    
+    while (m_cursor < m_length)
+    {
+        char c = m_buffer[m_cursor++];
+        
+        if (c == 0)
+            return len;
+        
+        len++;
+    }
+    
+    return -1;
+}
+
 /*================================================================================*\
 ** AlignedWriter
 \*================================================================================*/

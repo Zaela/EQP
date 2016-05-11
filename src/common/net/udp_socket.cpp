@@ -53,8 +53,58 @@ void UdpSocket::close()
 
 void UdpSocket::addClientAuth(Authorized& auth)
 {
-    //check if the client is already in the pending auth queue
+    // Check if the client is already in the queue and waiting for an auth
+    for (UdpClient& cli : m_clients)
+    {
+        // Unfortunately we have to dereference the client without being sure it's them --
+        // we don't have the port, need to check with the client for their account id
+        if (cli.ipAddress == auth.ipAddress && cli.handler->accountId() == auth.accountId)
+        {
+            cli.isAuthed = true;
+            return;
+        }
+    }
+    
     m_authorized.push_back(auth);
+}
+
+bool UdpSocket::isClientAuthorized(uint32_t ipAddress, uint32_t accountId, const char* sessionId)
+{
+    if (m_authorized.empty())
+        return false;
+    
+    uint32_t n = m_authorized.size() - 1;
+    
+    for (uint32_t i = 0; i <= n; i++)
+    {
+        Authorized& a = m_authorized[i];
+        
+        if (a.ipAddress == ipAddress && a.accountId == accountId && memcmp(a.sessionKey, sessionId, 10) == 0)
+        {
+            // Swap and pop
+            if (i < n)
+            {
+                m_authorized[i] = m_authorized.back();
+                m_authorized.pop_back();
+            }
+            
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+void UdpSocket::flagClientAsAuthorized(uint32_t ipAddress, uint16_t port)
+{
+    for (UdpClient& cli : m_clients)
+    {
+        if (cli.ipAddress == ipAddress && cli.port == port)
+        {
+            cli.isAuthed = true;
+            return;
+        }
+    }
 }
 
 void UdpSocket::receive()
@@ -79,13 +129,24 @@ void UdpSocket::receive()
         uint32_t ip         = addr.sin_addr.s_addr;
         uint16_t port       = addr.sin_port;
         
-        for (UdpClient& cli : m_clients)
+        uint32_t i = 0;
+        while (i < m_clients.size())
         {
+            UdpClient& cli = m_clients[i];
+            
+            if (cli.isDead)
+            {
+                swapAndPop(i, cli);
+                continue;
+            }
+            
             if (cli.ipAddress == ip && cli.port == port)
             {
                 client = &cli;
                 goto got_client;
             }
+            
+            i++;
         }
         
         // If we reach here, this is a new client
@@ -106,25 +167,26 @@ void UdpSocket::sendRaw(const void* data, uint32_t len, const IpAddress& addr)
     ::sendto(m_socket, (const char*)data, (int)len, 0, (struct sockaddr*)&addr, sizeof(IpAddress));
 }
 
+void UdpSocket::swapAndPop(uint32_t i, UdpClient& client)
+{
+    delete client.handler;
+    client.handler = nullptr;
+    
+    // Swap and pop
+    if (i < (m_clients.size() - 1))
+    {
+        m_clients[i] = std::move(m_clients.back());
+        m_clients.pop_back();
+    }
+}
+
 void UdpSocket::removeHandler(ProtocolHandler* handler)
 {
-    uint32_t n = m_clients.size();
-    
-    for (uint32_t i = 0; i < n; i++)
+    for (UdpClient& cli : m_clients)
     {
-        UdpClient& cli = m_clients[i];
-        
         if (cli.handler == handler)
         {
-            delete cli.handler;
-            cli.handler = nullptr;
-            // Swap and pop
-            if (i < (n - 1))
-            {
-                m_clients[i] = std::move(m_clients.back());
-                m_clients.pop_back();
-            }
-            
+            cli.isDead = true;
             return;
         }
     }
