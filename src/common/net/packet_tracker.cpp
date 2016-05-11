@@ -7,7 +7,8 @@ PacketTracker::PacketTracker(IpAddress& addr, UdpSocket& socket)
   m_address(addr),
   m_socket(socket),
   m_packetsSent(0),
-  m_packetsReceived(0)
+  m_packetsReceived(0),
+  m_sessionId(0)
 {
 
 }
@@ -17,8 +18,20 @@ PacketTracker::~PacketTracker()
     
 }
 
+void PacketTracker::queueInputPacket(byte* data, uint32_t len)
+{
+    byte* copy = new byte[len];
+    memcpy(copy, data, len);
+    
+    m_inputPacketQueue.emplace_back(copy, len);
+}
+
 void PacketTracker::sendImmediateNoIncrement(const void* data, uint32_t len)
 {
+    const byte* d = (const byte*)data;
+    printf("-> ");
+    for (uint32_t i = 0; i < len; i++) printf("%02x ", d[i]);
+    printf("\n");
     // This function uses sendto() directly to avoid needing to dereference the UdpSocket just to get the fd
     
     // UDP sends are effectively instant from the application's point of view (no blocking/EAGAIN)

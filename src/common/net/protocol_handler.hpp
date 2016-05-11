@@ -9,14 +9,13 @@
 #include "aligned.hpp"
 #include "clock.hpp"
 #include "crc.hpp"
-#include "packet_tracker.hpp"
+#include "ack_manager.hpp"
 #include <sqlite3.h>
 #include <zlib.h>
 
-class ProtocolHandler : public PacketTracker
+class ProtocolHandler : public AckManager
 {
 private:
-    uint32_t    m_sessionId;    // This is stored in network byte order
     uint32_t    m_crcKey;
     uint64_t    m_startTimeMilliseconds;    // For SessionStatResponse
     

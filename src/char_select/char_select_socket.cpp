@@ -19,5 +19,18 @@ ProtocolHandler* CharSelectSocket::createProtocolHandler(IpAddress& addr)
 
 void CharSelectSocket::processPacketQueues()
 {
-    
+    for (UdpClient& cli : m_clients)
+    {
+        if (cli.hasInputPacketsQueued)
+        {
+            ((CharSelectClient*)cli.handler)->processInputPacketQueue();
+            cli.hasInputPacketsQueued = false;
+        }
+        
+        if (cli.hasOutputPacketsQueued)
+        {
+            if (((CharSelectClient*)cli.handler)->processOutputPacketQueue())
+                cli.hasOutputPacketsQueued = false;
+        }
+    }
 }

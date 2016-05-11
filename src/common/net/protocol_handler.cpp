@@ -3,8 +3,7 @@
 #include "udp_socket.hpp"
 
 ProtocolHandler::ProtocolHandler(IpAddress& addr, UdpSocket& socket)
-: PacketTracker(addr, socket),
-  m_sessionId(0),
+: AckManager(addr, socket),
   m_crcKey(0),
   m_startTimeMilliseconds(Clock::milliseconds())
 {
@@ -20,13 +19,14 @@ bool ProtocolHandler::receive(byte* data, uint32_t len)
 {
     incrementPacketsReceived();
     receive(data, len, false);
-    return false; //return hasInputPacketsReadyToRead();
+    return hasInputPacketsQueued();
 }
 
 void ProtocolHandler::receive(byte* data, uint32_t len, bool isFromCombined)
 {
     AlignedReader r(data, len);
     
+    printf("<- ");
     for (uint32_t i = 0; i < len; i++)
     {
         printf("%02x ", data[i]);
@@ -38,39 +38,44 @@ void ProtocolHandler::receive(byte* data, uint32_t len, bool isFromCombined)
     if (opcode > 0xff)
     {
         // Raw, unordered packet, no protocol
-        //handle
+        queueInputPacket(data, len);
         return;
     }
     
+    // Packets that aren't subject to verification checks
     switch (opcode)
     {
     case EQProtocol::SessionRequest:
         handleSessionRequest(r);
-        break;
+        return;
     
     case EQProtocol::SessionDisconnect:
         handleSessionDisconnect();
-        break;
+        return;
     
+    default:
+        break;
+    }
+    
+    if (!validateAndDecompressPacket(r, isFromCombined))
+        return;
+    
+    switch (opcode)
+    {
     case EQProtocol::SessionStatsRequest:
-        if (validateAndDecompressPacket(r, isFromCombined))
-            handleSessionStatsRequest(r);
+        handleSessionStatsRequest(r);
         break;
     
     case EQProtocol::Combined:
-        if (validateAndDecompressPacket(r, isFromCombined))
-            handleCombined(r);
+        handleCombined(r);
         break;
         
     case EQProtocol::Packet:
-        if (validateAndDecompressPacket(r, isFromCombined))
-            break;
-        //    handlePacket(r);
+        checkSequencePacket(r);
         break;
     
     case EQProtocol::Fragment:
-        //if (validateAndDecompressPacket(r, isFromCombined))
-        //    handleFragment(r);
+        checkSequenceFragment(r);
         break;
     
     default:
@@ -87,7 +92,7 @@ void ProtocolHandler::handleSessionRequest(AlignedReader& r)
     // unknown
     r.advance(sizeof(uint32_t));
     // session
-    m_sessionId = r.uint32();
+    setSessionId(r.uint32());
     
     ProtocolStruct::SessionResponse resp;
     AlignedWriter w(&resp, sizeof(ProtocolStruct::SessionResponse));
@@ -95,7 +100,7 @@ void ProtocolHandler::handleSessionRequest(AlignedReader& r)
     // opcode
     w.uint16(toNetworkShort(EQProtocol::SessionResponse));
     // session
-    w.uint32(m_sessionId);
+    w.uint32(sessionId());
     // crcKey
     sqlite3_randomness(sizeof(uint32_t), &m_crcKey);
     w.uint32(toNetworkLong(m_crcKey));
@@ -147,6 +152,7 @@ void ProtocolHandler::handleSessionStatsRequest(AlignedReader& r)
     resp.packetsSent            = toNetworkUint64(packetsSent());
     resp.packetsReceived        = toNetworkUint64(packetsReceived());
     
+    //fixme: need to compress and crc this packet
     sendImmediateNoIncrement(&resp, sizeof(ProtocolStruct::SessionStatsServer));
 }
 
@@ -221,7 +227,7 @@ void ProtocolHandler::disconnect()
     // opcode
     w.uint16(toNetworkShort(EQProtocol::SessionDisconnect));
     // session
-    w.uint32(m_sessionId);
+    w.uint32(sessionId());
     
     sendImmediate(&dis, sizeof(ProtocolStruct::SessionDisconnect));
     socket().removeHandler(this);

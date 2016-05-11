@@ -9,7 +9,7 @@ CINCLUDE=
 CDEF=
 
 #ifdef debug
-CFLAG+= -O0 -g -Wno-format
+CFLAG+= -O0 -g -Wno-format -fno-omit-frame-pointer
 BUILDTYPE= debug
 #else
 #CFLAG+= -DNDEBUG
@@ -17,7 +17,7 @@ BUILDTYPE= debug
 #endif
 
 # temp
-#CDEF+= -DEQP_DISABLE_PACKET_COMPRESSION=1
+CDEF+= -DEQP_DISABLE_PACKET_COMPRESSION=1
 
 DIRBIN= bin/
 
@@ -71,10 +71,12 @@ HCOMMON_ALL+= $(HCOMMON_LOG)
 DIRCOMMON_NET= $(DIRCOMMON)net/
 BCOMMON_NET= $(BCOMMON)net/
 _OCOMMON_NET= \
- udp_socket.o   protocol_handler.o   packet_tracker.o
+ udp_socket.o   protocol_handler.o   packet_tracker.o   ack_manager.o
 _HCOMMON_NET= eq_packet_protocol.hpp packet_structs_protocol.hpp \
- packet_structs_login.hpp \
- udp_socket.hpp protocol_handler.hpp packet_tracker.hpp
+ packet_structs_login.hpp opcodes.hpp opcodes_canonical.hpp opcodes_titanium.hpp \
+ opcodes_sof.hpp opcodes_sod.hpp opcodes_underfoot.hpp opcodes_rof.hpp \
+ opcodes_rof2.hpp opcode_translation.hpp \
+ udp_socket.hpp protocol_handler.hpp packet_tracker.hpp ack_manager.hpp
 OCOMMON_NET= $(patsubst %,$(BCOMMON_NET)%,$(_OCOMMON_NET))
 HCOMMON_NET= $(patsubst %,$(DIRCOMMON_NET)%,$(_HCOMMON_NET))
 
