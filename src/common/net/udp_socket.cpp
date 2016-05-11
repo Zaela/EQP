@@ -98,7 +98,7 @@ void UdpSocket::receive()
     }
 }
 
-void UdpSocket::sendImmediate(const void* data, uint32_t len, const IpAddress& addr)
+void UdpSocket::sendRaw(const void* data, uint32_t len, const IpAddress& addr)
 {
     // UDP sends are effectively instant from the application's point of view (no blocking/EAGAIN)
     // Furthermore, the only way they can really fail is if the OS's buffer overflows;

@@ -3,8 +3,7 @@
 #include "udp_socket.hpp"
 
 ProtocolHandler::ProtocolHandler(IpAddress& addr, UdpSocket& socket)
-: m_address(addr),
-  m_socket(socket),
+: PacketTracker(addr, socket),
   m_sessionId(0),
   m_crcKey(0),
   m_startTimeMilliseconds(Clock::milliseconds())
@@ -19,7 +18,7 @@ ProtocolHandler::~ProtocolHandler()
 
 bool ProtocolHandler::receive(byte* data, uint32_t len)
 {
-    m_packetsReceived++;
+    incrementPacketsReceived();
     receive(data, len, false);
     return false; //return hasInputPacketsReadyToRead();
 }
@@ -54,22 +53,29 @@ void ProtocolHandler::receive(byte* data, uint32_t len, bool isFromCombined)
         break;
     
     case EQProtocol::SessionStatsRequest:
-        handleSessionStatsRequest(r);
+        if (validateAndDecompressPacket(r, isFromCombined))
+            handleSessionStatsRequest(r);
         break;
     
     case EQProtocol::Combined:
-        handleCombined(r);
+        if (validateAndDecompressPacket(r, isFromCombined))
+            handleCombined(r);
+        break;
+        
+    case EQProtocol::Packet:
+        if (validateAndDecompressPacket(r, isFromCombined))
+            break;
+        //    handlePacket(r);
+        break;
+    
+    case EQProtocol::Fragment:
+        //if (validateAndDecompressPacket(r, isFromCombined))
+        //    handleFragment(r);
         break;
     
     default:
         break;
     }
-}
-
-void ProtocolHandler::sendImmediate(const void* data, uint32_t len)
-{
-    m_packetsSent++;
-    m_socket.sendImmediate(data, len, m_address);
 }
 
 void ProtocolHandler::handleSessionRequest(AlignedReader& r)
@@ -94,9 +100,17 @@ void ProtocolHandler::handleSessionRequest(AlignedReader& r)
     sqlite3_randomness(sizeof(uint32_t), &m_crcKey);
     w.uint32(toNetworkLong(m_crcKey));
     // validation
+#ifdef EQP_DISABLE_PACKET_CRC
     w.uint8(0);
+#else
+    w.uint8(ProtocolStruct::SessionResponse::Validation::CRC);
+#endif
     // format
-    w.uint8(0);//ProtocolStruct::SessionRequest::Format::Compressed);
+#ifdef EQP_DISABLE_PACKET_COMPRESSION
+    w.uint8(0);
+#else
+    w.uint8(ProtocolStruct::SessionResponse::Format::Compressed);
+#endif
     // unknownA
     w.uint8(0);
     // maxLength
@@ -116,7 +130,7 @@ void ProtocolHandler::handleSessionStatsRequest(AlignedReader& r)
         return;
     
     // The response counts itself as a packet sent
-    m_packetsSent++;
+    incrementPacketsSent();
     
     // Both structs just happens to be perfectly aligned along 8-byte boundaries
     // (But we copy the request just in case it was part of a combined packet...)
@@ -130,10 +144,10 @@ void ProtocolHandler::handleSessionStatsRequest(AlignedReader& r)
     resp.serverTime             = (uint32_t)(Clock::milliseconds() - m_startTimeMilliseconds);
     resp.packetsSentEcho        = req.packetsSent;
     resp.packetsReceivedEcho    = req.packetsReceived;
-    resp.packetsSent            = toNetworkUint64(m_packetsSent);
-    resp.packetsReceived        = toNetworkUint64(m_packetsReceived);
+    resp.packetsSent            = toNetworkUint64(packetsSent());
+    resp.packetsReceived        = toNetworkUint64(packetsReceived());
     
-    m_socket.sendImmediate(&resp, sizeof(ProtocolStruct::SessionStatsServer), m_address);
+    sendImmediateNoIncrement(&resp, sizeof(ProtocolStruct::SessionStatsServer));
 }
 
 void ProtocolHandler::handleCombined(AlignedReader& r)
@@ -150,6 +164,55 @@ void ProtocolHandler::handleCombined(AlignedReader& r)
     }
 }
 
+bool ProtocolHandler::validateAndDecompressPacket(AlignedReader& r, bool isFromCombined)
+{
+#ifndef EQP_DISABLE_PACKET_CRC
+    if (!isFromCombined)
+    {
+        if (!CRC16::validatePacket(r.all(), r.size(), m_crcKey))
+            return false;
+        // Don't count the CRC in the length hereafter
+        r.reduceSize(sizeof(uint16_t));
+    }
+#endif
+    
+    byte flag = r.peekByte();
+    
+    if (flag == 0x5a) // Compressed
+    {
+        if (!decompressPacket(r))
+            return false;
+    }
+    else if (flag == 0xa5) // Explicitly not compressed
+    {
+        r.advance(sizeof(byte)); // Skip the flag byte
+    }
+    
+    return true;
+}
+
+bool ProtocolHandler::decompressPacket(AlignedReader& r)
+{
+    r.reset();
+    
+    byte* buffer = socket().getDecompressionBuffer();
+    // Write the protocol opcode into the first two bytes of the buffer
+    // Keeps things consistent, allows us to avoid some oddball special cases
+    *(uint16_t*)buffer = r.uint16();
+    
+    r.advance(sizeof(byte)); // Compressed flag
+    
+    unsigned long bLength = UdpSocket::BUFFER_SIZE - 2;
+    
+    if (uncompress(buffer + 2, &bLength, r.current(), r.remaining()) != Z_OK)
+        return false;
+    
+    r.reset(buffer, (uint32_t)bLength + 2);
+    r.advance(sizeof(uint16_t)); // Protocol opcode
+    
+    return true;
+}
+
 void ProtocolHandler::disconnect()
 {
     ProtocolStruct::SessionDisconnect dis;
@@ -160,6 +223,6 @@ void ProtocolHandler::disconnect()
     // session
     w.uint32(m_sessionId);
     
-    m_socket.sendImmediate(&dis, sizeof(ProtocolStruct::SessionDisconnect), m_address);
-    m_socket.removeHandler(this);
+    sendImmediate(&dis, sizeof(ProtocolStruct::SessionDisconnect));
+    socket().removeHandler(this);
 }

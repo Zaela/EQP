@@ -61,6 +61,12 @@ uint64_t AlignedReader::uint64()
     return ret;
 }
 
+uint8_t AlignedReader::peekUint8()
+{
+    check(sizeof(uint8_t));
+    return m_buffer[m_cursor];
+}
+
 void AlignedReader::buffer(void* ptr, uint32_t len)
 {
     ::byte* dst = (::byte*)ptr;

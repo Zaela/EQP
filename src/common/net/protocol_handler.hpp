@@ -8,19 +8,16 @@
 #include "packet_structs_protocol.hpp"
 #include "aligned.hpp"
 #include "clock.hpp"
+#include "crc.hpp"
+#include "packet_tracker.hpp"
 #include <sqlite3.h>
+#include <zlib.h>
 
-class UdpSocket;
-
-class ProtocolHandler
+class ProtocolHandler : public PacketTracker
 {
 private:
-    IpAddress   m_address;
-    UdpSocket&  m_socket;
     uint32_t    m_sessionId;    // This is stored in network byte order
     uint32_t    m_crcKey;
-    uint64_t    m_packetsSent;
-    uint64_t    m_packetsReceived;
     uint64_t    m_startTimeMilliseconds;    // For SessionStatResponse
     
 private:
@@ -29,6 +26,9 @@ private:
     void handleSessionStatsRequest(AlignedReader& r);
     void handleCombined(AlignedReader& r);
 
+    bool validateAndDecompressPacket(AlignedReader& r, bool isFromCombined);
+    bool decompressPacket(AlignedReader& r);
+
     void receive(byte* data, uint32_t len, bool isFromCombined);
     
 public:
@@ -36,7 +36,6 @@ public:
     virtual ~ProtocolHandler();
     
     bool receive(byte* data, uint32_t len);
-    void sendImmediate(const void* data, uint32_t len);
     void disconnect();
 };
 

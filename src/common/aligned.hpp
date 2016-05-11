@@ -26,16 +26,42 @@ namespace
             m_cursor += len;
             
             if (m_cursor > m_length)
-                throw Exception("[AlignedWriter::advance] Attempt to write beyond end of buffer");
+                throw Exception("[AlignedWriter::advance] Attempt to advance beyond end of buffer");
             
             return v;
+        }
+        
+        inline void check(uint32_t len)
+        {
+            uint32_t c = m_cursor + len;
+            if (c > m_length)
+                throw Exception("[AlignedWriter::check] Attempt to check beyond end of buffer");
         }
         
         inline uint32_t size() const { return m_length; }
         inline uint32_t remaining() const { return m_length - m_cursor; }
         inline uint32_t position() const { return m_cursor; }
-        inline ::byte* all() const { return m_buffer; }
-        inline ::byte* current() const { return m_buffer + m_cursor; }
+        inline byte* all() const { return m_buffer; }
+        inline byte* current() const { return m_buffer + m_cursor; }
+        
+        void reduceSize(uint32_t by) { m_length -= by; }
+        
+        void reset()
+        {
+            m_cursor = 0;
+        }
+        
+        void reset(uint32_t offset)
+        {
+            m_cursor = offset;
+        }
+        
+        void reset(void* ptr, uint32_t length)
+        {
+            m_cursor = 0;
+            m_length = length;
+            m_buffer = (byte*)ptr;
+        }
     };
 }
 
@@ -53,6 +79,10 @@ public:
     uint32_t uint32();
     int64_t int64() { return (int64_t)uint64(); }
     uint64_t uint64();
+    
+    ::byte peekByte() { return peekUint8(); }
+    int8_t peekInt8() { return (int8_t)peekUint8(); }
+    uint8_t peekUint8();
     
     void buffer(void* dst, uint32_t len);
 };

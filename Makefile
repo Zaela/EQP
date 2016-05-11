@@ -6,6 +6,7 @@ COPT= -O2 -fomit-frame-pointer -std=c++11
 CWARN= -Wall -Wextra -Wredundant-decls
 CWARNIGNORE= -Wno-unused-result -Wno-strict-aliasing
 CINCLUDE=
+CDEF=
 
 #ifdef debug
 CFLAG+= -O0 -g -Wno-format
@@ -15,6 +16,9 @@ BUILDTYPE= debug
 #BUILDTYPE= release
 #endif
 
+# temp
+#CDEF+= -DEQP_DISABLE_PACKET_COMPRESSION=1
+
 DIRBIN= bin/
 
 ##############################################################################
@@ -23,9 +27,9 @@ DIRBIN= bin/
 DIRCOMMON= src/common/
 BCOMMON= build/$(BUILDTYPE)/common/
 _OCOMMON= \
- file.o   exception.o   aligned.o
+ file.o   exception.o   aligned.o   crc.o
 _HCOMMON= define.hpp terminal.hpp bit.hpp \
- file.hpp exception.hpp aligned.hpp
+ file.hpp exception.hpp aligned.hpp crc.hpp
 OCOMMON= $(patsubst %,$(BCOMMON)%,$(_OCOMMON))
 HCOMMON= $(patsubst %,$(DIRCOMMON)%,$(_HCOMMON))
 
@@ -67,10 +71,10 @@ HCOMMON_ALL+= $(HCOMMON_LOG)
 DIRCOMMON_NET= $(DIRCOMMON)net/
 BCOMMON_NET= $(BCOMMON)net/
 _OCOMMON_NET= \
- udp_socket.o   protocol_handler.o
+ udp_socket.o   protocol_handler.o   packet_tracker.o
 _HCOMMON_NET= eq_packet_protocol.hpp packet_structs_protocol.hpp \
  packet_structs_login.hpp \
- udp_socket.hpp protocol_handler.hpp
+ udp_socket.hpp protocol_handler.hpp packet_tracker.hpp
 OCOMMON_NET= $(patsubst %,$(BCOMMON_NET)%,$(_OCOMMON_NET))
 HCOMMON_NET= $(patsubst %,$(DIRCOMMON_NET)%,$(_HCOMMON_NET))
 
@@ -172,7 +176,7 @@ BINCHARSELECT= $(DIRBIN)eqp-char-select
 ##############################################################################
 LFLAGS=
 LSTATIC= 
-LDYNAMIC= -lm -pthread -lrt -lsqlite3
+LDYNAMIC= -lm -pthread -lrt -lsqlite3 -lz
 
 ##############################################################################
 # Util
@@ -201,19 +205,19 @@ amalg-master:
 	$(Q)luajit amalg/amalg.lua master src/master/
 	$(E) "\033[0;32mCreating amalgamated source file\033[0m"
 	$(E) "Building $(BINMASTER)"
-	$(Q)$(CXX) -o $(BINMASTER) amalg/amalg_master.cpp $(LSTATIC) $(LDYNAMIC) $(LFLAGS) $(COPT) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDEMASTER)
+	$(Q)$(CXX) -o $(BINMASTER) amalg/amalg_master.cpp $(LSTATIC) $(LDYNAMIC) $(LFLAGS) $(COPT) $(CDEF) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDEMASTER)
 
 amalg-login:
 	$(Q)luajit amalg/amalg.lua login src/login/
 	$(E) "\033[0;32mCreating amalgamated source file\033[0m"
 	$(E) "Building $(BINLOGIN)"
-	$(Q)$(CXX) -o $(BINLOGIN) amalg/amalg_login.cpp $(LSTATIC) $(LDYNAMIC) -lcrypto $(LFLAGS) $(COPT) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDELOGIN)
+	$(Q)$(CXX) -o $(BINLOGIN) amalg/amalg_login.cpp $(LSTATIC) $(LDYNAMIC) -lcrypto $(LFLAGS) $(COPT) $(CDEF) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDELOGIN)
 
 amalg-char-select:
 	$(Q)luajit amalg/amalg.lua char_select src/char_select/
 	$(E) "\033[0;32mCreating amalgamated source file\033[0m"
 	$(E) "Building $(BINCHARSELECT)"
-	$(Q)$(CXX) -o $(BINCHARSELECT) amalg/amalg_char_select.cpp $(LSTATIC) $(LDYNAMIC) $(LFLAGS) $(COPT) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDECHARSELECT)
+	$(Q)$(CXX) -o $(BINCHARSELECT) amalg/amalg_char_select.cpp $(LSTATIC) $(LDYNAMIC) $(LFLAGS) $(COPT) $(CDEF) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDECHARSELECT)
 
 $(BINMASTER): $(OMASTER) $(OCOMMON_ALL)
 	$(E) "Linking $@"
@@ -229,19 +233,19 @@ $(BINCHARSELECT): $(OCHARSELECT) $(OCOMMON_ALL)
 
 $(BCOMMON)%.o: $(DIRCOMMON)%.cpp $(HCOMMON_ALL)
 	$(E) "\033[0;32mCXX       $@\033[0m"
-	$(Q)$(CXX) -c -o $@ $< $(COPT) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE)
+	$(Q)$(CXX) -c -o $@ $< $(COPT) $(CDEF) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE)
 
 $(BMASTER)%.o: $(DIRMASTER)%.cpp $(HMASTER)
 	$(E) "\033[0;32mCXX       $@\033[0m"
-	$(Q)$(CXX) -c -o $@ $< $(COPT) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDEMASTER)
+	$(Q)$(CXX) -c -o $@ $< $(COPT) $(CDEF) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDEMASTER)
 
 $(BLOGIN)%.o: $(DIRLOGIN)%.cpp $(HLOGIN)
 	$(E) "\033[0;32mCXX       $@\033[0m"
-	$(Q)$(CXX) -c -o $@ $< $(COPT) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDELOGIN)
+	$(Q)$(CXX) -c -o $@ $< $(COPT) $(CDEF) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDELOGIN)
 
 $(BCHARSELECT)%.o: $(DIRCHARSELECT)%.cpp $(HCHARSELECT)
 	$(E) "\033[0;32mCXX       $@\033[0m"
-	$(Q)$(CXX) -c -o $@ $< $(COPT) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDECHARSELECT)
+	$(Q)$(CXX) -c -o $@ $< $(COPT) $(CDEF) $(CWARN) $(CWARNIGNORE) $(CFLAGS) $(CINCLUDE) $(INCLUDECHARSELECT)
 
 ##############################################################################
 # Clean rules

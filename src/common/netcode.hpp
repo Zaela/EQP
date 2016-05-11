@@ -1,6 +1,6 @@
 
-#ifndef _EQP_NETCODE_H_
-#define _EQP_NETCODE_H_
+#ifndef _EQP_NETCODE_HPP_
+#define _EQP_NETCODE_HPP_
 
 #ifdef EQP_WINDOWS
 # include <winsock2.h>
@@ -44,4 +44,4 @@ typedef int socklen_t;
 
 typedef struct sockaddr_in IpAddress;
 
-#endif//_EQP_NETCODE_H_
+#endif//_EQP_NETCODE_HPP_

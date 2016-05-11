@@ -71,7 +71,7 @@ public:
         char        sessionKey[10];
     };
     
-private:
+public:
     static const int BUFFER_SIZE = 1024;
     
 protected:
@@ -84,8 +84,13 @@ protected:
 
     LogWriterCommon&        m_logWriter;
 
+    byte    m_compressionBuffer[BUFFER_SIZE];
+    byte    m_decompressionBuffer[BUFFER_SIZE];
+
 private:
     virtual ProtocolHandler* createProtocolHandler(IpAddress& addr) = 0;
+
+    void sendRaw(const void* data, uint32_t len, const IpAddress& addr);
 
 public:
     UdpSocket(LogWriterCommon& logWriter);
@@ -94,10 +99,13 @@ public:
     void open(uint16_t port);
     void close();
     void receive();
-    void sendImmediate(const void* data, uint32_t len, const IpAddress& addr);
     
     void addClientAuth(Authorized& auth);
     void removeHandler(ProtocolHandler* handler);
+
+    int getSocketFileDescriptor() const { return m_socket; }
+    byte* getCompressionBuffer() { return m_compressionBuffer; }
+    byte* getDecompressionBuffer() { return m_decompressionBuffer; }
 };
 
 #endif//_EQP_UDP_SOCKET_HPP_

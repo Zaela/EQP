@@ -26,6 +26,11 @@ namespace ProtocolStruct
         uint32_t    maxLength;
         uint32_t    unknownB;
         
+        enum Validation
+        {
+            CRC = 0x02
+        };
+        
         enum Format
         {
             Compressed  = 0x01,
