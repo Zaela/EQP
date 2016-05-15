@@ -85,5 +85,3 @@ not_found:
     disconnect();
     return false;
 }
-
-#include "packet_handlers_canonical.inline.cpp"

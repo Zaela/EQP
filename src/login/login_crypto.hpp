@@ -17,17 +17,18 @@ private:
 
 private:
     DES_key_schedule    m_keySchedule;
+    DES_key_schedule    m_keyScheduleTrilogy;
     byte                m_buffer[BUFFER_SIZE];
 
 private:
-    uint32_t crypt(const void* input, uint32_t length, int encrypt);
+    uint32_t crypt(const void* input, uint32_t length, int encrypt, bool isTrilogy = false);
     
 public:
     LoginCrypto();
     ~LoginCrypto();
 
-    uint32_t encrypt(const void* input, uint32_t length);
-    uint32_t decrypt(const void* input, uint32_t length);
+    uint32_t encrypt(const void* input, uint32_t length, bool isTrilogy = false);
+    uint32_t decrypt(const void* input, uint32_t length, bool isTrilogy = false);
 
     void hash(const char* pass, uint32_t passlen, const byte* salt, uint32_t saltlen);
 

@@ -15,6 +15,9 @@
 #include "server_op.hpp"
 #include "packet_structs_protocol.hpp"
 #include "packet_structs_login.hpp"
+#include "random.hpp"
+#include "login_client.hpp"
+#include "crc.hpp"
 #include <vector>
 #include <string>
 
@@ -24,28 +27,6 @@
 class Login
 {
 private:
-    struct Client
-    {
-        uint32_t ipAddress;
-        uint16_t port;
-        uint16_t recvAck;
-        uint16_t sendAck;
-        uint16_t progress;
-        uint16_t playSequence;
-        uint16_t playAck;
-        uint64_t lastActivityTimestamp;
-        int64_t  accountId;
-    };
-    
-    enum Progress : uint16_t
-    {
-        None,
-        Session,
-        LoginRequested,
-        LoggedIn,
-        ReceivedServerList
-    };
-    
     static const int BUFFER_SIZE = 1024;
     
     enum LoginOp : uint16_t
@@ -108,36 +89,38 @@ private:
     std::string     m_serverName;
     uint32_t        m_serverPlayerCount;
 
-    std::vector<Client> m_clients;
+    std::vector<LoginClient> m_clients;
 
     int     m_socket;
     byte    m_sockBuffer[BUFFER_SIZE];
 
     LoginCrypto m_crypto;
 
+#include "login_trilogy.inline.hpp"
+
 private:
     void initSocket();
 
     void processIpc(IpcPacket& packet);
-    void processProtocol(byte* data, int len, Client* client);
-    void processCombined(byte* data, int len, Client* client);
+    void processProtocol(byte* data, int len, LoginClient* client);
+    void processCombined(byte* data, int len, LoginClient* client);
     void processPacket(int len, IpAddress& addr);
-    void processPacket(byte* data, int len, Client* client);
+    void processPacket(byte* data, int len, LoginClient* client);
     void checkForTimeouts(uint64_t timestamp);
-    void swapAndPop(Client* client);
+    void swapAndPop(LoginClient* client);
 
-    void sendSessionResponse(Client* client);
+    void sendSessionResponse(LoginClient* client);
     void send(uint32_t ipAddress, uint16_t port, const void* data, uint32_t len);
-    void send(Client* client, const void* data, uint32_t len);
+    void send(LoginClient* client, const void* data, uint32_t len);
 
     LoginCrypto& crypto() { return m_crypto; }
     
-    void processLoginRequest(Client* client, uint16_t seq);
-    void processCredentials(byte* data, int len, Client* client, uint16_t seq);
-    void processServerListRequest(Client* client, uint16_t seq);
-    void processPlayRequest(byte* data, int len, Client* client, uint16_t seq);
+    void processLoginRequest(LoginClient* client, uint16_t seq);
+    void processCredentials(byte* data, int len, LoginClient* client, uint16_t seq);
+    void processServerListRequest(LoginClient* client, uint16_t seq);
+    void processPlayRequest(byte* data, int len, LoginClient* client, uint16_t seq);
     void processPlayResponse(IpcPacket& packet);
-    void sendClientAuthToMaster(Client* client);
+    void sendClientAuthToMaster(LoginClient* client);
 
 public:
     Login();

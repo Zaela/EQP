@@ -1,4 +1,7 @@
 
+#include "char_select_client.hpp"
+#include "udp_socket.hpp"
+
 void CharSelectClient::handleLoginInfoCanonical(AlignedReader& r)
 {
     // info -> accountId as a string, null terminator, session key
@@ -24,7 +27,10 @@ void CharSelectClient::handleLoginInfoCanonical(AlignedReader& r)
         
         //fixme: should not disconnect right away if this fails -- race condition with auth from login server
         if (socket().isClientAuthorized(ipAddress(), accountId(), sessionId))
+        {
+            socket().flagClientAsAuthorized(ipAddress(), port());
             return;
+        }
     }
     
 failure:

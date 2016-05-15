@@ -4,8 +4,8 @@
 
 #include "define.hpp"
 #include "exception.hpp"
+#include "random.hpp"
 #include <string>
-#include <sqlite3.h>
 
 namespace
 {

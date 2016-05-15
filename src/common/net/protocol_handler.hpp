@@ -10,7 +10,7 @@
 #include "clock.hpp"
 #include "crc.hpp"
 #include "ack_manager.hpp"
-#include <sqlite3.h>
+#include "random.hpp"
 #include <zlib.h>
 
 class ProtocolHandler : public AckManager

@@ -27,9 +27,9 @@ DIRBIN= bin/
 DIRCOMMON= src/common/
 BCOMMON= build/$(BUILDTYPE)/common/
 _OCOMMON= \
- file.o   exception.o   aligned.o   crc.o
+ file.o   exception.o   aligned.o   crc.o   random.o
 _HCOMMON= define.hpp terminal.hpp bit.hpp netcode.hpp \
- file.hpp exception.hpp aligned.hpp crc.hpp
+ file.hpp exception.hpp aligned.hpp crc.hpp random.hpp
 OCOMMON= $(patsubst %,$(BCOMMON)%,$(_OCOMMON))
 HCOMMON= $(patsubst %,$(DIRCOMMON)%,$(_HCOMMON))
 
@@ -148,10 +148,10 @@ BINMASTER= $(DIRBIN)eqp-master
 ##############################################################################
 DIRLOGIN= src/login/
 BLOGIN= build/$(BUILDTYPE)/login/
-_OLOGIN= login_main.o \
- login.o   login_crypto.o
+_OLOGIN= login_main.o login_trilogy.o \
+ login.o   login_crypto.o   login_client.o   
 _HLOGIN= \
- login.hpp login_crypto.hpp
+ login.hpp login_crypto.hpp login_client.hpp 
 OLOGIN= $(patsubst %,$(BLOGIN)%,$(_OLOGIN))
 HLOGIN= $(patsubst %,$(DIRLOGIN)%,$(_HLOGIN))
 
@@ -163,7 +163,7 @@ BINLOGIN= $(DIRBIN)eqp-login
 ##############################################################################
 DIRCHARSELECT= src/char_select/
 BCHARSELECT= build/$(BUILDTYPE)/char_select/
-_OCHARSELECT= char_select_main.o \
+_OCHARSELECT= char_select_main.o packet_handlers_canonical.o \
  char_select.o   char_select_client.o   char_select_socket.o
 _HCHARSELECT= packet_handlers_canonical.inline.hpp \
  packet_handlers_titanium.inline.hpp \

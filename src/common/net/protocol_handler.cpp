@@ -102,7 +102,7 @@ void ProtocolHandler::handleSessionRequest(AlignedReader& r)
     // session
     w.uint32(sessionId());
     // crcKey
-    sqlite3_randomness(sizeof(uint32_t), &m_crcKey);
+    m_crcKey = Random::uint32();
     w.uint32(toNetworkLong(m_crcKey));
     // validation
 #ifdef EQP_DISABLE_PACKET_CRC
@@ -175,7 +175,7 @@ bool ProtocolHandler::validateAndDecompressPacket(AlignedReader& r, bool isFromC
 #ifndef EQP_DISABLE_PACKET_CRC
     if (!isFromCombined)
     {
-        if (!CRC16::validatePacket(r.all(), r.size(), m_crcKey))
+        if (!CRC::validatePacket(r.all(), r.size(), m_crcKey))
             return false;
         // Don't count the CRC in the length hereafter
         r.reduceSize(sizeof(uint16_t));

@@ -157,5 +157,5 @@ void AlignedWriter::random(uint32_t bytes)
 {
     uint32_t c = advance(bytes);
     
-    sqlite3_randomness((int)bytes, m_buffer + c);
+    Random::bytes(m_buffer + c, (int)bytes);
 }

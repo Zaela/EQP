@@ -1,7 +1,7 @@
 
 #include "crc.hpp"
 
-static uint32_t crc16_table[] = {
+static uint32_t crc_table[] = {
 	0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
 	0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
 	0x1DB71064, 0x6AB020F2, 0xF3B97148, 0x84BE41DE, 0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7,
@@ -36,18 +36,18 @@ static uint32_t crc16_table[] = {
 	0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94, 0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D
 };
 
-uint32_t CRC16::update(const byte* data, uint32_t len, uint32_t crc)
+uint32_t CRC::update(const byte* data, uint32_t len, uint32_t crc)
 {
 	for (uint32_t i = 0; i < len; i++)
     {
-		crc = (crc >> 8) ^ crc16_table[data[i] ^ (crc & 0xff)];
+		crc = (crc >> 8) ^ crc_table[data[i] ^ (crc & 0xff)];
     }
     
 	return crc;
 }
 
 
-uint16_t CRC16::calc(const void* data, uint32_t len, uint32_t key)
+uint16_t CRC::calc16(const void* data, uint32_t len, uint32_t key)
 {
     if (key == 0)
         return 0;
@@ -62,12 +62,22 @@ uint16_t CRC16::calc(const void* data, uint32_t len, uint32_t key)
     return ~crc & 0xffff;
 }
 
-uint16_t CRC16::calcNetworkByteOrder(const void* data, uint32_t len, uint32_t key)
+uint16_t CRC::calc16NetworkByteOrder(const void* data, uint32_t len, uint32_t key)
 {
-    return toNetworkShort(calc(data, len, key));
+    return toNetworkShort(calc16(data, len, key));
 }
 
-bool CRC16::validatePacket(const void* packet, uint32_t len, uint32_t key)
+uint32_t CRC::calc32(const void* data, uint32_t len)
+{
+    return ~update((const byte*)data, len);
+}
+
+uint32_t CRC::calc32NetworkByteOrder(const void* data, uint32_t len)
+{
+    return toNetworkLong(calc32(data, len));
+}
+
+bool CRC::validatePacket(const void* packet, uint32_t len, uint32_t key)
 {
     if (key == 0)
         return true;
@@ -79,6 +89,6 @@ bool CRC16::validatePacket(const void* packet, uint32_t len, uint32_t key)
     if (checkCRC == 0)
         return true;
     
-    uint16_t dataCRC = calc(data, len, key);
+    uint16_t dataCRC = calc16(data, len, key);
     return (dataCRC == checkCRC);
 }

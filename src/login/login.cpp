@@ -162,17 +162,14 @@ void Login::processIpc(IpcPacket& packet)
 
 void Login::processPacket(int len, IpAddress& addr)
 {
-    uint32_t ip     = addr.sin_addr.s_addr;
-    uint16_t port   = addr.sin_port;
-    Client* client  = nullptr;
+    uint32_t ip         = addr.sin_addr.s_addr;
+    uint16_t port       = addr.sin_port;
+    LoginClient* client = nullptr;
     
     // Find the Client in our list
-    uint32_t i = 0;
-    for (; i < m_clients.size(); i++)
+    for (LoginClient& cli : m_clients)
     {
-        Client& cli = m_clients[i];
-        
-        if (cli.ipAddress == ip && cli.port == port)
+        if (cli.ipAddress() == ip && cli.port() == port)
         {
             client = &cli;
             break;
@@ -182,31 +179,26 @@ void Login::processPacket(int len, IpAddress& addr)
     // Is it a new client? If so, add them
     if (!client)
     {
-        Client cli;
-        
-        cli.ipAddress       = ip;
-        cli.port            = port;
-        cli.recvAck         = 0;
-        cli.sendAck         = 0;
-        cli.progress        = Progress::None;
-        cli.playSequence    = 0;
-        cli.playAck         = 0;
-        cli.accountId       = 0;
-        
-        m_clients.push_back(cli);
+        m_clients.emplace_back(ip, port);
         client = &m_clients.back();
+        
+        if (isTrilogyClient(client, m_sockBuffer, len))
+            len = 0;
     }
     
-    client->lastActivityTimestamp = Clock::milliseconds();
+    client->setLastActivityTime();
     
     // Anything meaningful will be at least protocol opcode + sequence, 4 bytes
     if (len < 4)
         return;
     
-    processProtocol(m_sockBuffer, len, client);
+    if (client->isTrilogy())
+        processProtocolTrilogy(m_sockBuffer, len, client);
+    else
+        processProtocol(m_sockBuffer, len, client);
 }
 
-void Login::processProtocol(byte* data, int len, Client* client)
+void Login::processProtocol(byte* data, int len, LoginClient* client)
 {
     uint16_t opcode = toHostShort(*(uint16_t*)data);
     data += 2;
@@ -235,7 +227,7 @@ void Login::processProtocol(byte* data, int len, Client* client)
     }
 }
 
-void Login::processCombined(byte* data, int len, Client* client)
+void Login::processCombined(byte* data, int len, LoginClient* client)
 {
     int read = 0;
     
@@ -253,7 +245,7 @@ void Login::processCombined(byte* data, int len, Client* client)
     }
 }
 
-void Login::processPacket(byte* data, int len, Client* client)
+void Login::processPacket(byte* data, int len, LoginClient* client)
 {
     uint16_t seq    = toHostShort(*(uint16_t*)data);
     uint16_t opcode = *(uint16_t*)(data + sizeof(uint16_t));
@@ -289,9 +281,9 @@ void Login::checkForTimeouts(uint64_t timestamp)
     
     while (i < m_clients.size())
     {
-        Client& cli = m_clients[i];
+        LoginClient& cli = m_clients[i];
         
-        if ((timestamp - cli.lastActivityTimestamp) > EQP_LOGIN_TIMEOUT_MILLISECONDS)
+        if ((timestamp - cli.lastActivityTime()) > EQP_LOGIN_TIMEOUT_MILLISECONDS)
         {
             swapAndPop(&cli);
             continue;
@@ -301,7 +293,7 @@ void Login::checkForTimeouts(uint64_t timestamp)
     }
 }
 
-void Login::swapAndPop(Client* client)
+void Login::swapAndPop(LoginClient* client)
 {
     uint32_t i = 0;
     uint32_t n = m_clients.size() - 1;
@@ -320,7 +312,7 @@ void Login::swapAndPop(Client* client)
     m_clients.pop_back();
 }
 
-void Login::sendSessionResponse(Client* client)
+void Login::sendSessionResponse(LoginClient* client)
 {
     AlignedReader req(m_sockBuffer, sizeof(ProtocolStruct::SessionRequest));
     req.advance(offsetof(ProtocolStruct::SessionRequest, session));
@@ -341,7 +333,7 @@ void Login::sendSessionResponse(Client* client)
     
     send(client, &resp, sizeof(ProtocolStruct::SessionResponse));
     
-    client->progress = Progress::Session;
+    client->setProgress(LoginClient::Progress::Session);
 }
 
 void Login::send(uint32_t ipAddress, uint16_t port, const void* data, uint32_t len)
@@ -356,12 +348,12 @@ void Login::send(uint32_t ipAddress, uint16_t port, const void* data, uint32_t l
     ::sendto(m_socket, (const char*)data, (int)len, 0, (struct sockaddr*)&addr, sizeof(IpAddress));
 }
 
-void Login::send(Client* client, const void* data, uint32_t len)
+void Login::send(LoginClient* client, const void* data, uint32_t len)
 {
-    send(client->ipAddress, client->port, data, len);
+    send(client->ipAddress(), client->port(), data, len);
 }
 
-void Login::processLoginRequest(Client* client, uint16_t seq)
+void Login::processLoginRequest(LoginClient* client, uint16_t seq)
 {
 #pragma pack(1)
     struct Reply
@@ -375,10 +367,10 @@ void Login::processLoginRequest(Client* client, uint16_t seq)
     };
 #pragma pack()
         
-    if (client->progress != Progress::Session)
+    if (client->progress() != LoginClient::Progress::Session)
         return;
     
-    Reply reply(seq, sizeof(Reply), client->sendAck++, LoginOp::ChatMessage);
+    Reply reply(seq, sizeof(Reply), client->getSendAckAndIncrement(), LoginOp::ChatMessage);
     
     memset(reply.data, 0, sizeof(reply.data));
     
@@ -390,13 +382,13 @@ void Login::processLoginRequest(Client* client, uint16_t seq)
     
     send(client, &reply, sizeof(reply));
     
-    client->progress = Progress::LoginRequested;
+    client->setProgress(LoginClient::Progress::LoginRequested);
 }
 
-void Login::processCredentials(byte* data, int len, Client* client, uint16_t seq)
+void Login::processCredentials(byte* data, int len, LoginClient* client, uint16_t seq)
 {
     // Must be at least 10 + encrypted portion (min 8)
-    if (len < 18 || (uint32_t)len > BUFFER_SIZE || client->progress != Progress::LoginRequested)
+    if (len < 18 || (uint32_t)len > BUFFER_SIZE || client->progress() != LoginClient::Progress::LoginRequested)
         return;
     
     data += 10;
@@ -480,7 +472,7 @@ void Login::processCredentials(byte* data, int len, Client* client, uint16_t seq
             crypto().clear();
             
             // Send LoginAccepted failure packet
-            Rejected rejected(seq, sizeof(Rejected), client->sendAck++, LoginOp::LoginAccepted);
+            Rejected rejected(seq, sizeof(Rejected), client->getSendAckAndIncrement(), LoginOp::LoginAccepted);
             
             AlignedWriter w = rejected.writer();
             
@@ -515,7 +507,7 @@ void Login::processCredentials(byte* data, int len, Client* client, uint16_t seq
     query.bindString(1, username, namelen); // username gets copied internally here, so okay to clobber below
     
     byte salt[16]; // 128-bit salt
-    sqlite3_randomness(sizeof(salt), salt);
+    Random::bytes(salt, sizeof(salt));
     
     crypto().hash(passcopy, passlen, salt, sizeof(salt));
     
@@ -529,11 +521,12 @@ void Login::processCredentials(byte* data, int len, Client* client, uint16_t seq
 login:
     // Zero out the crypto buffer before sending anything to the client
     crypto().clear();
+    memset(passcopy, 0, sizeof(passcopy));
     
     // Send LoginAccepted success packet
     const Request* req = (Request*)data; // This is all aligned
     
-    Accepted accepted(seq, sizeof(Accepted), client->sendAck++, LoginOp::LoginAccepted);
+    Accepted accepted(seq, sizeof(Accepted), client->getSendAckAndIncrement(), LoginOp::LoginAccepted);
     
     AlignedWriter wAccept = accepted.writer();
     
@@ -576,11 +569,11 @@ login:
     
     send(client, &accepted, sizeof(accepted));
     
-    client->progress    = Progress::LoggedIn;
-    client->accountId   = id;
+    client->setProgress(LoginClient::Progress::LoggedIn);
+    client->setAccountId(id);
 }
 
-void Login::processServerListRequest(Client* client, uint16_t seq)
+void Login::processServerListRequest(LoginClient* client, uint16_t seq)
 {
 #pragma pack(1)
     struct ServerList : public AckPlus
@@ -599,7 +592,7 @@ void Login::processServerListRequest(Client* client, uint16_t seq)
     };
 #pragma pack()
         
-    if (client->progress < Progress::LoggedIn)
+    if (client->progress() < LoginClient::Progress::LoggedIn)
         return;
     
     // Need to do some gymnastics to figure out the size, plus limit the packet data to 255 bytes (to fit size in 1 byte for combined)
@@ -626,7 +619,7 @@ void Login::processServerListRequest(Client* client, uint16_t seq)
     ServerList* list = (ServerList*)data;
     
     // Call constructor
-    new (list) ServerList(seq, size, client->sendAck++, LoginOp::ServerListResponse);
+    new (list) ServerList(seq, size, client->getSendAckAndIncrement(), LoginOp::ServerListResponse);
     
     AlignedWriter w = list->writer();
     
@@ -660,10 +653,10 @@ void Login::processServerListRequest(Client* client, uint16_t seq)
     
     send(client, list, size);
     
-    client->progress = Progress::ReceivedServerList;
+    client->setProgress(LoginClient::Progress::ReceivedServerList);
 }
 
-void Login::processPlayRequest(byte* data, int len, Client* client, uint16_t seq)
+void Login::processPlayRequest(byte* data, int len, LoginClient* client, uint16_t seq)
 {
 #pragma pack(1)
     struct PlayRequest
@@ -674,18 +667,17 @@ void Login::processPlayRequest(byte* data, int len, Client* client, uint16_t seq
     };
 #pragma pack()
     
-    if ((uint32_t)len < sizeof(PlayRequest) || client->progress < Progress::LoggedIn)
+    if ((uint32_t)len < sizeof(PlayRequest) || client->progress() < LoginClient::Progress::LoggedIn)
         return;
     
     AlignedReader r(data, len);
     
     // 'Sequence' -- needed in the eventual reply to the client
-    client->playSequence    = r.uint16();
-    client->playAck         = seq;
-    
+    client->setPlayValues(r.uint16(), seq);
+
     LoginStruct::Request req;
     
-    req.accountId   = (uint32_t)client->accountId;
+    req.accountId   = (uint32_t)client->accountId();
     req.serverId    = 1;
     
     // Send a login request to Master with the accountId
@@ -717,30 +709,30 @@ void Login::processPlayResponse(IpcPacket& packet)
     int64_t accountId = (int64_t)r->accountId;
     
     // Find the client
-    Client* client = nullptr;
+    LoginClient* client = nullptr;
     
-    for (Client& cli : m_clients)
+    for (LoginClient& cli : m_clients)
     {
-        if (cli.accountId == accountId)
+        if (cli.accountId() == accountId)
         {
             client = &cli;
             break;
         }
     }
     
-    if (!client || client->progress < Progress::LoggedIn)
+    if (!client || client->progress() < LoginClient::Progress::LoggedIn)
         return;
     
     if (r->response == 1)
         sendClientAuthToMaster(client);
     
-    PlayResponse resp(client->playAck, sizeof(PlayResponse), client->sendAck++, LoginOp::PlayResponse);
+    PlayResponse resp(client->playAck(), sizeof(PlayResponse), client->getSendAckAndIncrement(), LoginOp::PlayResponse);
     AlignedWriter w = resp.writer();
     
     w.zeroAll();
     
     // sequence
-    w.uint8((uint8_t)client->playSequence);
+    w.uint8((uint8_t)client->playSequence());
     // unknownA
     w.advance(9);
     // allowed
@@ -777,7 +769,7 @@ void Login::processPlayResponse(IpcPacket& packet)
     send(client, &resp, sizeof(PlayResponse));
 }
 
-void Login::sendClientAuthToMaster(Client* client)
+void Login::sendClientAuthToMaster(LoginClient* client)
 {
     LoginStruct::ClientAuth auth;
     AlignedWriter w(&auth, sizeof(LoginStruct::ClientAuth));
@@ -785,7 +777,7 @@ void Login::sendClientAuthToMaster(Client* client)
     char buf[30];
     
     // accountId
-    w.uint32((uint32_t)client->accountId);
+    w.uint32((uint32_t)client->accountId());
     
     // name
     memset(buf, 0, sizeof(buf));
@@ -802,7 +794,7 @@ void Login::sendClientAuthToMaster(Client* client)
     // worldAdminLevel
     w.int16(0);
     // ipAddress
-    w.uint32(client->ipAddress);
+    w.uint32(client->ipAddress());
     // isFromLocalNetwork
     w.boolean(true);
     
